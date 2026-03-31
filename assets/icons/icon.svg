@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1c3e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1124;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4f46e5;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="db" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#a5b4fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded rectangle -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+
+  <!-- Outer decorative ring -->
+  <circle cx="512" cy="512" r="400" fill="none" stroke="url(#ring)" stroke-width="12" opacity="0.3"/>
+
+  <!-- Inner ring with glow -->
+  <circle cx="512" cy="512" r="340" fill="none" stroke="url(#ring)" stroke-width="20" filter="url(#glow)" opacity="0.8"/>
+
+  <!-- Database cylinder body -->
+  <!-- Top ellipse -->
+  <ellipse cx="512" cy="340" rx="200" ry="52" fill="url(#db)" opacity="0.95"/>
+  <!-- Cylinder sides -->
+  <rect x="312" y="340" width="400" height="220" fill="url(#db)" opacity="0.85"/>
+  <!-- Bottom ellipse of top section -->
+  <ellipse cx="512" cy="560" rx="200" ry="52" fill="#5558e3" opacity="0.9"/>
+
+  <!-- Second tier (slightly lower, smaller for perspective) -->
+  <ellipse cx="512" cy="610" rx="200" ry="52" fill="url(#db)" opacity="0.7"/>
+  <rect x="312" y="610" width="400" height="60" fill="url(#db)" opacity="0.6"/>
+  <ellipse cx="512" cy="670" rx="200" ry="52" fill="#4f46e5" opacity="0.65"/>
+
+  <!-- Third tier -->
+  <ellipse cx="512" cy="710" rx="200" ry="52" fill="url(#db)" opacity="0.45"/>
+  <rect x="312" y="710" width="400" height="40" fill="url(#db)" opacity="0.35"/>
+  <ellipse cx="512" cy="750" rx="200" ry="52" fill="#4338ca" opacity="0.4"/>
+
+  <!-- Highlight line on top ellipse -->
+  <ellipse cx="512" cy="340" rx="200" ry="52" fill="none" stroke="#c7d2fe" stroke-width="4" opacity="0.6"/>
+
+  <!-- Shine on top ellipse -->
+  <ellipse cx="480" cy="330" rx="80" ry="22" fill="white" opacity="0.12"/>
+</svg>

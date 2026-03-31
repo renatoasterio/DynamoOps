@@ -1,0 +1,244 @@
+import { $, $$ } from '../utils/dom.js';
+import { state } from '../state/store.js';
+import { api } from '../api/apiClient.js';
+import { showToast } from '../utils/toast.js';
+import { getActiveTabConnection } from './TabManager.js';
+import { saveVersion } from './VersionHistory.js';
+import { trackWrite } from './CostTracker.js';
+import { getTemplate, buildTemplateFormHTML, buildItemFromForm } from './ItemTemplateManager.js';
+
+// form vs json mode for new-item modal
+let insertMode = 'json'; // 'form' | 'json'
+
+export function getKeyNames() {
+    if (!state.tableInfo || !state.tableInfo.KeySchema) return [];
+    return state.tableInfo.KeySchema.map(k => k.AttributeName);
+}
+
+const dom = {
+    modalOverlay: $('#modal-overlay'),
+    modalTitle: $('#modal-title'),
+    modalCloseBtn: $('#modal-close-btn'),
+    editorInfo: $('#editor-info'),
+    itemEditor: $('#item-editor'),
+    editorError: $('#editor-error'),
+    modalCancelBtn: $('#modal-cancel-btn'),
+    modalSaveBtn: $('#modal-save-btn'),
+    
+    deleteOverlay: $('#delete-overlay'),
+    deleteCloseBtn: $('#delete-close-btn'),
+    deletePreview: $('#delete-preview'),
+    deleteCancelBtn: $('#delete-cancel-btn'),
+    deleteConfirmBtn: $('#delete-confirm-btn'),
+    
+    addItemBtn: $('#add-item-btn'),
+    loadingState: $('#loading-state'),
+    emptyState: $('#empty-data-state'),
+    dataViewer: $('#data-viewer'),
+    tableInfoBar: $('#table-info-bar'),
+    tableName: $('#current-table-name'),
+    toolbar: $('#toolbar'),
+};
+
+export function initItemManager() {
+    dom.addItemBtn.addEventListener('click', () => openEditModal(null));
+    
+    dom.modalCloseBtn.addEventListener('click', closeItemModal);
+    dom.modalCancelBtn.addEventListener('click', closeItemModal);
+    dom.modalOverlay.addEventListener('click', (e) => {
+        if (e.target === dom.modalOverlay) closeItemModal();
+    });
+
+    document.addEventListener('openItemModalRequest', (e) => {
+        openEditModal(e.detail ? e.detail.item : null);
+    });
+
+    document.addEventListener('openDeleteModalRequest', (e) => {
+        openDeleteModal(e.detail.item);
+    });
+
+    // Toggle form ↔ JSON in new-item modal
+    $('#modal-mode-toggle')?.addEventListener('click', () => {
+        insertMode = insertMode === 'form' ? 'json' : 'form';
+        refreshNewItemView();
+    });
+
+    dom.modalSaveBtn.addEventListener('click', async () => {
+        let item;
+
+        // Collect from template form or JSON textarea
+        if (insertMode === 'form' && !state.editingItem) {
+            item = buildItemFromForm();
+            if (!item) {
+                dom.editorError.textContent = 'Erro ao ler formulário.';
+                dom.editorError.classList.remove('hidden');
+                return;
+            }
+        } else {
+            try {
+                item = JSON.parse(dom.itemEditor.value);
+            } catch (err) {
+                dom.editorError.textContent = `Invalid JSON: ${err.message}`;
+                dom.editorError.classList.remove('hidden');
+                return;
+            }
+        }
+
+        const keyNames = getKeyNames();
+        for (const k of keyNames) {
+            if (item[k] === undefined || item[k] === '') {
+                dom.editorError.textContent = `Key attribute "${k}" is required.`;
+                dom.editorError.classList.remove('hidden');
+                return;
+            }
+        }
+
+        try {
+            const connection = getActiveTabConnection();
+            // Save version snapshot before overwriting (only for edits, not new inserts)
+            if (state.editingItem) {
+                saveVersion(state.currentTable, state.editingItem);
+            }
+            const _t0 = Date.now();
+            const putResult = await api('PUT', `/tables/${state.currentTable}/items`, { item }, { connection });
+            trackWrite(state.currentTable, putResult?.consumedCapacity, 'put', Date.now() - _t0, 1);
+            showToast(state.editingItem ? 'Item updated successfully' : 'Item created successfully', 'success');
+            closeItemModal();
+            document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
+        } catch (err) {
+            dom.editorError.textContent = err.message;
+            dom.editorError.classList.remove('hidden');
+        }
+    });
+
+    let deleteTarget = null;
+
+    dom.deleteCloseBtn.addEventListener('click', closeDeleteModal);
+    dom.deleteCancelBtn.addEventListener('click', closeDeleteModal);
+    dom.deleteOverlay.addEventListener('click', (e) => {
+        if (e.target === dom.deleteOverlay) closeDeleteModal();
+    });
+
+    dom.deleteConfirmBtn.addEventListener('click', async () => {
+        if (!state.deletingTarget) return;
+
+        const keyNames = getKeyNames();
+        const key = {};
+        keyNames.forEach((k) => (key[k] = state.deletingTarget[k]));
+
+        try {
+            const connection = getActiveTabConnection();
+            const _t0 = Date.now();
+            const delResult = await api('DELETE', `/tables/${state.currentTable}/items`, { key }, { connection });
+            trackWrite(state.currentTable, delResult?.consumedCapacity, 'delete', Date.now() - _t0, 1);
+            showToast('Item deleted', 'success');
+            closeDeleteModal();
+            document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
+        } catch (err) {
+            showToast(`Delete failed: ${err.message}`, 'error');
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeItemModal();
+            closeDeleteModal();
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            if (!dom.modalOverlay.classList.contains('hidden') || !dom.deleteOverlay.classList.contains('hidden')) return;
+            document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
+        }
+    });
+
+}
+
+export function openEditModal(item = null) {
+    state.editingItem = item;
+    dom.editorError.classList.add('hidden');
+
+    if (item) {
+        // Edit existing: always JSON
+        insertMode = 'json';
+        dom.modalTitle.textContent = 'Edit Item';
+        dom.editorInfo.innerHTML = 'Modify the JSON below. Key attributes cannot be changed — to change keys, delete and re-create the item.';
+        dom.itemEditor.value = JSON.stringify(item, null, 2);
+        _showJsonEditor();
+        _hideModeToggle();
+    } else {
+        // New item: prefer form if template exists
+        const tpl = getTemplate(state.currentTable);
+        insertMode = tpl ? 'form' : 'json';
+        dom.modalTitle.textContent = 'New Item';
+        refreshNewItemView();
+        _showModeToggle(!!tpl);
+    }
+
+    dom.modalOverlay.classList.remove('hidden');
+}
+
+function refreshNewItemView() {
+    dom.editorError.classList.add('hidden');
+    const tpl = getTemplate(state.currentTable);
+    const toggle = $('#modal-mode-toggle');
+    if (toggle) toggle.textContent = insertMode === 'form' ? '{ } JSON' : '📋 Form';
+
+    if (insertMode === 'form' && tpl) {
+        const keyNames = getKeyNames();
+        dom.editorInfo.innerHTML = `Template: <strong>${state.currentTable}</strong> · ${tpl.length} campos`;
+        _showFormEditor(tpl);
+    } else {
+        const keyNames = getKeyNames();
+        // Pre-fill JSON with template defaults if available, else just keys
+        let seed = {};
+        if (tpl) {
+            tpl.forEach(f => { seed[f.name] = f.defaultValue !== undefined ? f.defaultValue : ''; });
+        } else {
+            keyNames.forEach(k => { seed[k] = ''; });
+        }
+        dom.editorInfo.innerHTML = `Required keys: <strong>${keyNames.join(', ')}</strong>`;
+        dom.itemEditor.value = JSON.stringify(seed, null, 2);
+        _showJsonEditor();
+    }
+}
+
+function _showJsonEditor() {
+    dom.itemEditor.closest?.('.item-editor-wrap')?.classList.remove('hidden');
+    dom.itemEditor.classList.remove('hidden');
+    $('#template-form-wrap')?.classList.add('hidden');
+}
+
+function _showFormEditor(tpl) {
+    dom.itemEditor.classList.add('hidden');
+    const wrap = $('#template-form-wrap');
+    if (wrap) {
+        wrap.innerHTML = buildTemplateFormHTML(state.currentTable) || '';
+        wrap.classList.remove('hidden');
+    }
+}
+
+function _showModeToggle(hasTpl) {
+    const toggle = $('#modal-mode-toggle');
+    if (!toggle) return;
+    toggle.classList.toggle('hidden', !hasTpl);
+    toggle.textContent = insertMode === 'form' ? '{ } JSON' : '📋 Form';
+}
+
+function _hideModeToggle() {
+    $('#modal-mode-toggle')?.classList.add('hidden');
+}
+
+function closeItemModal() {
+    dom.modalOverlay.classList.add('hidden');
+    state.editingItem = null;
+}
+
+export function openDeleteModal(item) {
+    state.deletingTarget = item;
+    dom.deletePreview.textContent = JSON.stringify(item, null, 2);
+    dom.deleteOverlay.classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    dom.deleteOverlay.classList.add('hidden');
+    state.deletingTarget = null;
+}

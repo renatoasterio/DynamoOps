@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DynamoDB GUI — Visual Database Manager</title>
+    <meta name="description"
+        content="Visual GUI tool for AWS DynamoDB — query, insert, update and delete items with a beautiful interface." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <!-- ─── Login Screen ───────────────────────────────────────────── -->
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo-large">
+                    <svg width="60" height="60" viewBox="0 0 28 28" fill="none">
+                        <circle cx="14" cy="14" r="13" stroke="url(#grad-lg)" stroke-width="2" />
+                        <path
+                            d="M8 10c0-2 2.7-3.5 6-3.5s6 1.5 6 3.5M8 14c0 2 2.7 3.5 6 3.5s6-1.5 6-3.5M8 10v8c0 2 2.7 3.5 6 3.5s6-1.5 6-3.5v-8"
+                            stroke="url(#grad-lg)" stroke-width="1.6" stroke-linecap="round" />
+                        <defs>
+                            <linearGradient id="grad-lg" x1="0" y1="0" x2="28" y2="28">
+                                <stop stop-color="#6366f1" />
+                                <stop offset="1" stop-color="#a855f7" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1>DynamoDB GUI</h1>
+                <p>Visual Database Manager</p>
+            </div>
+
+            <div class="login-tabs">
+                <button class="login-tab active" data-tab="quick">Quick Connect</button>
+                <button class="login-tab" data-tab="profiles">Saved Profiles</button>
+                <button class="login-tab" data-tab="assume">Assume Role</button>
+            </div>
+
+            <div class="login-content-wrapper">
+                <!-- Standard Connection -->
+                <div id="login-pane-quick" class="login-form-pane">
+                    <div class="form-group">
+                        <label>AWS Region</label>
+                        <select id="login-region">
+                            <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                            <option value="us-east-2">us-east-2 (Ohio)</option>
+                            <option value="us-west-1">us-west-1 (N. California)</option>
+                            <option value="us-west-2">us-west-2 (Oregon)</option>
+                            <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                            <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+                            <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>AWS Profile</label>
+                        <input type="text" id="login-profile" value="default" placeholder="default" />
+                    </div>
+                    <div class="form-group">
+                        <label>Custom Endpoint (Optional)</label>
+                        <input type="text" id="login-endpoint" placeholder="http://localhost:8000" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Environment</label>
+                        <div class="env-picker" id="login-env-picker">
+                            <button type="button" class="env-pick-btn env-pick-none active" data-env="none">None</button>
+                            <button type="button" class="env-pick-btn env-pick-dev" data-env="dev">Dev</button>
+                            <button type="button" class="env-pick-btn env-pick-staging" data-env="staging">Staging</button>
+                            <button type="button" class="env-pick-btn env-pick-prod" data-env="prod">Prod</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group-checkbox">
+                        <input type="checkbox" id="login-save-profile" />
+                        <label for="login-save-profile">Save this connection</label>
+                    </div>
+                    
+                    <div id="login-profile-name-group" class="form-group hidden">
+                        <label>Profile Name</label>
+                        <input type="text" id="login-save-name" placeholder="e.g. My Prod DB" />
+                    </div>
+                </div>
+
+                <!-- Saved Profiles -->
+                <div id="login-pane-profiles" class="login-form-pane hidden">
+                    <div id="login-profiles-list" class="saved-profiles-list-login">
+                        <!-- Profiles will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Assume Role -->
+                <div id="login-pane-assume" class="login-form-pane hidden">
+                    <!-- Primary fields -->
+                    <div class="form-group">
+                        <label>Account ID <span class="form-hint">12 digits</span></label>
+                        <input type="text" id="login-ar-account-id" placeholder="123456789012" maxlength="12" autocomplete="off" />
+                    </div>
+                    <div class="form-group">
+                        <label>Role Name</label>
+                        <input type="text" id="login-ar-role-name" placeholder="DevelopersRole" />
+                    </div>
+                    <div class="form-group">
+                        <label>AWS Profile <span class="form-hint">local credentials</span></label>
+                        <input type="text" id="login-ar-profile" value="default" placeholder="default" />
+                    </div>
+
+                    <!-- Secondary row: Region + Environment -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Region</label>
+                            <select id="login-ar-region">
+                                <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                                <option value="us-east-2">us-east-2 (Ohio)</option>
+                                <option value="us-west-1">us-west-1 (N. California)</option>
+                                <option value="us-west-2">us-west-2 (Oregon)</option>
+                                <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                                <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+                                <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Environment</label>
+                            <div class="env-picker" id="login-ar-env-picker">
+                                <button type="button" class="env-pick-btn env-pick-none active" data-env="none">None</button>
+                                <button type="button" class="env-pick-btn env-pick-dev" data-env="dev">Dev</button>
+                                <button type="button" class="env-pick-btn env-pick-staging" data-env="staging">Staging</button>
+                                <button type="button" class="env-pick-btn env-pick-prod" data-env="prod">Prod</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optional: Session Name -->
+                    <div class="form-group ar-session-group">
+                        <label>Session Name <span class="form-hint">opcional</span></label>
+                        <input type="text" id="login-ar-session" placeholder="dev-session (padrão)" autocomplete="off" />
+                    </div>
+
+                    <!-- Hidden ARN (built from Account ID + Role Name) -->
+                    <input type="hidden" id="login-ar-role" />
+
+                    <div class="form-group-checkbox">
+                        <input type="checkbox" id="login-ar-save" />
+                        <label for="login-ar-save">Save profile</label>
+                    </div>
+                    <div id="login-ar-name-group" class="form-group hidden">
+                        <label>Profile Name</label>
+                        <input type="text" id="login-ar-save-name" placeholder="e.g. Prod — DevelopersRole" />
+                    </div>
+
+                    <!-- Role History -->
+                    <div id="ar-role-history" class="ar-role-history hidden">
+                        <div class="ar-history-label">Histórico de funções</div>
+                        <div id="ar-history-list" class="ar-history-list"></div>
+                    </div>
+                </div>
+
+                <div id="login-error" class="login-error-msg hidden"></div>
+            </div>
+
+            <div class="login-footer">
+                <div class="login-footer-actions">
+                    <button id="login-test-btn" class="btn-login-secondary">Test Connection</button>
+                    <button id="login-submit-btn" class="btn-login-main">Connect to DynamoDB</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Main Header ────────────────────────────────────────────── -->
+    <header id="main-header" class="hidden">
+        <div class="logo" id="header-logo">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <circle cx="14" cy="14" r="13" stroke="url(#grad)" stroke-width="2" />
+                <path
+                    d="M8 10c0-2 2.7-3.5 6-3.5s6 1.5 6 3.5M8 14c0 2 2.7 3.5 6 3.5s6-1.5 6-3.5M8 10v8c0 2 2.7 3.5 6 3.5s6-1.5 6-3.5v-8"
+                    stroke="url(#grad)" stroke-width="1.6" stroke-linecap="round" />
+                <defs>
+                    <linearGradient id="grad" x1="0" y1="0" x2="28" y2="28">
+                        <stop stop-color="#6366f1" />
+                        <stop offset="1" stop-color="#a855f7" />
+                    </linearGradient>
+                </defs>
+            </svg>
+            <span>DynamoDB <strong>GUI</strong></span>
+        </div>
+        
+        <div id="header-actions">
+            <div id="role-badge" class="role-badge hidden">
+                <span class="role-icon">🛡️</span>
+                <span id="role-badge-text"></span>
+            </div>
+            <div id="env-tag-badge" class="env-badge hidden"></div>
+            <div id="conn-status" class="status disconnected">Disconnected</div>
+            <div class="header-btns">
+                <button id="switch-conn-btn" class="icon-btn-header" title="Switch AWS Connection">🔄</button>
+                <button id="theme-toggle-btn" class="icon-btn-header theme-toggle" title="Toggle theme">☀️</button>
+                <button id="logout-btn" class="icon-btn-header icon-btn-logout" title="Logout">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+
+    <!-- ─── Main Layout ────────────────────────────────────────────── -->
+    <div id="app-layout" class="hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h2>Tables</h2>
+                <div class="header-actions">
+                    <button id="create-table-btn" class="icon-btn" title="Create new table">＋</button>
+                    <button id="refresh-tables-btn" class="icon-btn" title="Refresh tables">↻</button>
+                </div>
+            </div>
+            <input type="text" id="table-search" placeholder="Search tables…" />
+            <ul id="table-list">
+                <li class="empty-state">Connect to see tables</li>
+            </ul>
+        </aside>
+
+        <!-- Main content -->
+        <main id="main-content">
+            <!-- Tabs Bar -->
+            <div id="tab-bar" class="tab-bar hidden"></div>
+
+            <!-- Welcome state -->
+            <div id="welcome-state" class="center-state">
+                <div class="welcome-icon">
+                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                        <circle cx="40" cy="40" r="38" stroke="url(#wg)" stroke-width="2" opacity="0.3" />
+                        <path
+                            d="M22 28c0-6 8-10 18-10s18 4 18 10M22 40c0 6 8 10 18 10s18-4 18-10M22 28v24c0 6 8 10 18 10s18-4 18-10V28"
+                            stroke="url(#wg)" stroke-width="2.5" stroke-linecap="round" opacity="0.6" />
+                        <defs>
+                            <linearGradient id="wg" x1="0" y1="0" x2="80" y2="80">
+                                <stop stop-color="#6366f1" />
+                                <stop offset="1" stop-color="#a855f7" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1>Welcome to DynamoDB GUI</h1>
+                <p>Connect to your AWS account and select a table to start exploring your data.</p>
+            </div>
+
+            <div id="table-info-bar" class="hidden">
+                <div class="table-name-section">
+                    <h2 id="current-table-name"></h2>
+                    <span id="table-item-count" class="badge"></span>
+                    <div class="table-info-actions">
+                        <button id="dashboard-btn" class="btn-secondary" title="Table Dashboard — metrics &amp; CloudWatch">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                            Dashboard
+                        </button>
+                        <button id="schema-export-btn" class="btn-secondary" title="Export Schema (CloudFormation / Terraform)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            Schema
+                        </button>
+                        <button id="indexes-btn" class="btn-secondary" title="Manage Indexes">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            Indexes
+                        </button>
+                        <div class="table-info-divider"></div>
+                        <button id="truncate-table-btn" class="icon-btn warning" title="Truncate Table">🧹</button>
+                        <button id="delete-table-btn" class="icon-btn danger" title="Delete Table">🗑</button>
+                    </div>
+                </div>
+                <div class="table-schema" id="table-schema-info"></div>
+            </div>
+
+            <!-- Toolbar -->
+            <div id="toolbar" class="hidden">
+                <div class="toolbar-left">
+                    <button id="add-item-btn" class="btn btn-primary">➕ Insert Item</button>
+                    <button id="template-btn" class="toolbar-icon-btn" title="Item Template — structured insert form">🧩 Template<span class="tpl-badge"></span></button>
+                    <button id="refresh-table-btn" class="toolbar-icon-btn" title="Refresh Data">🔄</button>
+                    <div class="search-container-premium">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="table-search-input" placeholder="Filter loaded items..." />
+                    </div>
+                </div>
+                <div class="toolbar-right">
+                    <button id="export-json-btn" class="toolbar-icon-btn" title="Export JSON">⬇ JSON</button>
+                    <button id="export-csv-btn" class="toolbar-icon-btn" title="Export CSV">⬇ CSV</button>
+                    <button id="import-btn" class="toolbar-icon-btn" title="Import JSON / CSV / Excel">⬆ Import</button>
+                    <button id="cost-panel-btn" class="toolbar-icon-btn" title="Cost Analytics — session cost tracker">💰 Cost</button>
+                    <button id="code-gen-btn" class="toolbar-icon-btn" title="Generate code for current query">&lt;/&gt; Code</button>
+                    <button id="history-toggle-btn" class="toolbar-icon-btn" title="Query History">🕒</button>
+                    <button id="stream-toggle-btn" class="toolbar-icon-btn" title="DynamoDB Streams — real-time feed">
+                        ⚡ Stream
+                        <span id="stream-status-badge" class="stream-badge hidden"></span>
+                    </button>
+                    <div class="divider"></div>
+                    <button id="filter-toggle-btn" class="btn-secondary">
+                        <span>⚙</span> Filters
+                    </button>
+                    <button id="run-btn" class="btn-accent">
+                        ▶ Execute
+                    </button>
+                </div>
+            </div>
+
+            <!-- Streams Panel -->
+            <div id="streams-panel" class="hidden">
+                <div class="streams-panel-header">
+                    <div class="streams-panel-title">
+                        <span class="streams-live-dot"></span>
+                        <strong>Live Stream</strong>
+                        <span id="stream-record-count" class="streams-count">0 events</span>
+                    </div>
+                    <div class="streams-panel-actions">
+                        <button id="stream-pause-btn" class="btn-text">⏸ Pause</button>
+                        <button id="stream-clear-btn" class="btn-text">Clear</button>
+                    </div>
+                </div>
+                <div id="stream-feed" class="stream-feed">
+                    <p id="stream-empty-msg" class="stream-empty">Waiting for stream events…</p>
+                </div>
+            </div>
+
+            <!-- History Panel -->
+            <div id="history-panel" class="hidden">
+                <div class="history-header">
+                    <h3>Recent Queries</h3>
+                    <button id="history-clear-btn" class="btn-text danger">Clear All</button>
+                </div>
+                <div id="history-list"></div>
+            </div>
+
+            <!-- Filter / Query panel -->
+            <div id="filter-panel" class="hidden">
+                <!-- Query mode selector -->
+                <div class="filter-mode-bar">
+                    <div class="query-mode-toggle">
+                        <button id="mode-scan-btn" class="toggle-btn active" title="Scan all items">Scan</button>
+                        <button id="mode-query-btn" class="toggle-btn" title="Query by key">Query</button>
+                        <button id="mode-sql-btn" class="toggle-btn" title="PartiQL SQL">SQL</button>
+                    </div>
+                </div>
+                <!-- Query mode fields -->
+                <div id="query-fields" class="hidden">
+                    <div class="filter-row">
+                        <div class="field">
+                            <label>Index</label>
+                            <select id="query-index">
+                                <option value="">Primary Key</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="field">
+                            <label>Partition Key</label>
+                            <input type="text" id="query-pk-name" placeholder="Attribute name" readonly />
+                        </div>
+                        <div class="field">
+                            <label>Value</label>
+                            <input type="text" id="query-pk-value" placeholder="Value" />
+                        </div>
+                    </div>
+                    <div class="filter-row" id="query-sk-row">
+                        <div class="field">
+                            <label>Sort Key</label>
+                            <input type="text" id="query-sk-name" placeholder="Attribute name" readonly />
+                        </div>
+                        <div class="field">
+                            <label>Condition</label>
+                            <select id="query-sk-op">
+                                <option value="=">=</option>
+                                <option value="<">
+                                    << /option>
+                                <option value="<=">
+                                    <=< /option>
+                                <option value=">">></option>
+                                <option value=">=">>=</option>
+                                <option value="begins_with">begins_with</option>
+                                <option value="between">between</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Value</label>
+                            <input type="text" id="query-sk-value" placeholder="Value" />
+                        </div>
+                        <div class="field" id="query-sk-value2-field" style="display:none">
+                            <label>Value 2</label>
+                            <input type="text" id="query-sk-value2" placeholder="Upper bound" />
+                        </div>
+                    </div>
+                </div>
+                <!-- Scan filter expression -->
+                <div id="scan-fields">
+                    <div class="filter-row">
+                        <div class="field full-width">
+                            <label>Filter Expression <span class="hint">(e.g. #status = :val)</span></label>
+                            <input type="text" id="scan-filter-expr"
+                                placeholder="attribute_exists(email) AND #status = :active" />
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="field">
+                            <label>Expression Attribute Names (JSON) <span class="hint">e.g.
+                                    {"#status":"status"}</span></label>
+                            <input type="text" id="scan-expr-names" placeholder='{"#status": "status"}' />
+                        </div>
+                        <div class="field">
+                            <label>Expression Attribute Values (JSON) <span class="hint">e.g.
+                                    {":active":"active"}</span></label>
+                            <input type="text" id="scan-expr-values" placeholder='{":active": "active"}' />
+                        </div>
+                    </div>
+                </div>
+                <!-- SQL mode fields -->
+                <div id="sql-fields" class="hidden">
+                    <div class="filter-row">
+                        <div class="field full-width">
+                            <label>PartiQL Statement (ANSI SQL)</label>
+                            <div class="sql-editor-container" style="position: relative; width: 100%;">
+                                <textarea id="sql-statement" rows="3" placeholder="SELECT * FROM &quot;table_name&quot; WHERE ..."></textarea>
+                                <ul id="sql-autocomplete" class="dropdown-menu hidden"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Pagination -->
+                <div class="filter-row">
+                    <div class="field">
+                        <label>Page Size</label>
+                        <input type="number" id="page-size" value="50" min="1" max="1000" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data viewer -->
+            <div id="data-viewer" class="hidden">
+                <div class="data-viewer-header">
+                    <div class="view-toggle">
+                        <button id="view-table-btn" class="toggle-btn active" title="Table view">Table</button>
+                        <button id="view-json-btn" class="toggle-btn" title="JSON view">JSON</button>
+                        <button id="view-chart-btn" class="toggle-btn" title="Chart &amp; Heatmap view">📊 Chart</button>
+                    </div>
+                </div>
+                <div id="table-view" class="data-view">
+                    <div class="table-wrapper">
+                        <table id="data-table">
+                            <thead id="data-thead"></thead>
+                            <tbody id="data-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="json-view" class="data-view hidden">
+                    <div id="json-content"></div>
+                </div>
+
+                <!-- Chart / Heatmap view -->
+                <div id="chart-view" class="data-view hidden">
+                    <div class="chart-view-header">
+                        <div class="chart-sub-tabs">
+                            <button id="chart-tab-timeline"     class="chart-sub-tab active">📈 Timeline</button>
+                            <button id="chart-tab-distribution" class="chart-sub-tab">📊 Distribuição</button>
+                            <button id="chart-tab-heatmap"      class="chart-sub-tab">🔥 Heatmap</button>
+                        </div>
+                        <div class="chart-controls">
+                            <select id="chart-date-field" class="chart-select" title="Campo de data"></select>
+                            <select id="chart-granularity" class="chart-select">
+                                <option value="hour">Por Hora</option>
+                                <option value="day" selected>Por Dia</option>
+                                <option value="month">Por Mês</option>
+                            </select>
+                            <select id="chart-num-field" class="chart-select hidden" title="Campo numérico"></select>
+                        </div>
+                    </div>
+                    <div id="chart-panel-timeline"     class="chart-panel"></div>
+                    <div id="chart-panel-distribution" class="chart-panel hidden"></div>
+                    <div id="chart-panel-heatmap"      class="chart-panel hidden"></div>
+                </div>
+                <!-- Cost session micro-bar -->
+                <div id="cost-session-bar" class="cost-session-bar"></div>
+
+                <!-- Pagination -->
+                <div id="pagination-bar">
+                    <span id="result-info"></span>
+                    <div id="pagination-controls" class="pagination-controls hidden">
+                        <button id="page-first-btn" class="page-btn" title="First page">«</button>
+                        <button id="page-prev-btn"  class="page-btn" title="Previous page">‹</button>
+                        <div id="page-numbers" class="page-numbers"></div>
+                        <button id="page-next-btn"  class="page-btn" title="Next page">›</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading state -->
+            <div id="loading-state" class="center-state hidden">
+                <div class="spinner"></div>
+                <p>Loading data…</p>
+            </div>
+
+            <!-- Empty data state -->
+            <div id="empty-data-state" class="center-state hidden">
+                <p>No items found. Try adjusting your filters or adding a new item.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- ─── Modal: Item Editor ─────────────────────────────────────── -->
+    <div id="modal-overlay" class="hidden">
+        <div id="item-modal">
+            <div class="modal-header">
+                <h3 id="modal-title">New Item</h3>
+                <button id="modal-close-btn" class="icon-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="editor-info-row">
+                    <div class="editor-info" id="editor-info"></div>
+                    <button id="modal-mode-toggle" class="btn-ghost hidden">📋 Form</button>
+                </div>
+                <textarea id="item-editor" spellcheck="false"
+                    placeholder='{ "pk": "value", "sk": "value", "attr": "data" }'></textarea>
+                <div id="template-form-wrap" class="hidden"></div>
+                <div id="editor-error" class="error-msg hidden"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="modal-save-btn" class="btn-primary">Save Item</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Delete Confirmation ─────────────────────────────── -->
+    <div id="delete-overlay" class="hidden">
+        <div id="delete-modal">
+            <div class="modal-header">
+                <h3>Delete Item</h3>
+                <button id="delete-close-btn" class="icon-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this item? This action cannot be undone.</p>
+                <pre id="delete-preview"></pre>
+            </div>
+            <div class="modal-footer">
+                <button id="delete-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="delete-confirm-btn" class="btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Create Table ────────────────────────────────────── -->
+    <div id="create-table-overlay" class="hidden">
+        <div id="create-table-modal" class="modal-content">
+            <div class="modal-header">
+                <h3>Create Table</h3>
+                <button id="create-table-close-btn" class="icon-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="ct-table-name">Table Name <span class="required">*</span></label>
+                    <input type="text" id="ct-table-name" placeholder="my-table" />
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="ct-pk-name">Partition Key <span class="required">*</span></label>
+                        <input type="text" id="ct-pk-name" placeholder="id" />
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="ct-pk-type">Type</label>
+                        <select id="ct-pk-type">
+                            <option value="S">String</option>
+                            <option value="N">Number</option>
+                            <option value="B">Binary</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label for="ct-sk-name">Sort Key <span class="hint">(optional)</span></label>
+                        <input type="text" id="ct-sk-name" placeholder="createdAt" />
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="ct-sk-type">Type</label>
+                        <select id="ct-sk-type">
+                            <option value="S">String</option>
+                            <option value="N">Number</option>
+                            <option value="B">Binary</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="ct-error" class="error-msg hidden"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="ct-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="ct-submit-btn" class="btn-primary">Create Table</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Delete Table Confirmation ──────────────────────── -->
+    <div id="delete-table-overlay" class="hidden">
+        <div id="delete-table-modal" class="modal-content">
+            <div class="modal-header">
+                <h3>Delete Table</h3>
+                <button id="delete-table-close-btn" class="icon-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete table <strong id="dt-table-name-preview"></strong>?</p>
+                <p style="color: var(--danger-hover); font-size: 11px; margin-top: 5px;">This will permanently delete the table and all its data. This action CANNOT be undone.</p>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>To confirm, type the table name below:</label>
+                    <input type="text" id="dt-confirm-name" placeholder="" />
+                </div>
+                <div id="dt-error" class="error-msg hidden"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="dt-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="dt-confirm-btn" class="btn-danger" disabled>Delete Table</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Truncate Table Confirmation ────────────────────── -->
+    <div id="truncate-table-overlay" class="hidden">
+        <div id="truncate-table-modal" class="modal-content">
+            <div class="modal-header">
+                <h3>Truncate Table</h3>
+                <button id="truncate-table-close-btn" class="icon-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to clear all data from <strong id="tt-table-name-preview"></strong>?</p>
+                <p style="color: var(--warning-hover); font-size: 11px; margin-top: 5px;">This will scan and delete every item in the table. This action CANNOT be undone.</p>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>To confirm, type the table name below:</label>
+                    <input type="text" id="tt-confirm-name" placeholder="" />
+                </div>
+                <div id="tt-progress" class="hidden" style="margin-top: 10px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--text-muted);">
+                    Deleting items... <span id="tt-deleted-count" style="color: var(--text-primary); font-weight: bold;">0</span> items removed.
+                </div>
+                <div id="tt-error" class="error-msg hidden"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="tt-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="tt-confirm-btn" class="btn-warning" disabled style="background-color: var(--warning); color: #000;">Truncate Table</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Version History ─────────────────────────────────── -->
+    <div id="version-history-overlay" class="modal-overlay hidden">
+        <div class="modal version-history-modal">
+            <div class="modal-header">
+                <h3>Version History</h3>
+                <button id="version-history-close-btn" class="modal-close-btn">✕</button>
+            </div>
+            <div class="version-history-body">
+                <div class="version-list-col">
+                    <p class="version-col-label">Saved versions</p>
+                    <div id="version-list" class="version-list"></div>
+                </div>
+                <div class="version-diff-col">
+                    <p class="version-col-label">
+                        Diff — <span class="diff-legend"><span class="legend-added">● added</span> <span class="legend-removed">● removed</span> <span class="legend-modified">● modified</span></span>
+                    </p>
+                    <div id="version-diff" class="version-diff">
+                        <p class="diff-placeholder">Select a version on the left to see the diff.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="version-restore-btn" class="btn btn-primary" disabled>Restore this version</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Export Fields ───────────────────────────────────── -->
+    <div id="export-fields-overlay" class="modal-overlay hidden">
+        <div class="modal export-fields-modal">
+            <div class="modal-header">
+                <h3>Export Data</h3>
+                <button id="export-fields-close-btn" class="modal-close-btn">✕</button>
+            </div>
+            <div class="export-fields-body">
+                <div class="export-format-row">
+                    <span class="export-format-label">Format</span>
+                    <div class="export-format-options">
+                        <label class="export-format-opt">
+                            <input type="radio" name="export-format" value="json" checked /> JSON
+                        </label>
+                        <label class="export-format-opt">
+                            <input type="radio" name="export-format" value="csv" /> CSV
+                        </label>
+                    </div>
+                </div>
+                <div class="export-fields-header">
+                    <span class="export-fields-title">Fields</span>
+                    <div class="export-fields-actions">
+                        <button id="export-select-all-btn" class="btn-link">Select all</button>
+                        <span class="export-fields-sep">·</span>
+                        <button id="export-select-none-btn" class="btn-link">None</button>
+                        <span class="export-fields-sep">·</span>
+                        <button id="export-select-keys-btn" class="btn-link">Keys only</button>
+                    </div>
+                </div>
+                <div id="export-fields-list" class="export-fields-list"></div>
+                <p class="export-fields-hint">
+                    <span id="export-selected-count">0</span> of <span id="export-total-count">0</span> fields selected
+                    · <span id="export-item-count">0</span> items
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button id="export-fields-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="export-confirm-btn" class="btn-primary">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Schema Export ───────────────────────────────────── -->
+    <div id="schema-export-overlay" class="modal-overlay hidden">
+        <div class="modal schema-export-modal">
+            <div class="modal-header">
+                <h3>Export Schema</h3>
+                <button id="schema-export-close-btn" class="modal-close-btn">✕</button>
+            </div>
+            <div class="schema-format-tabs">
+                <button id="schema-tab-cfn" class="schema-tab active">CloudFormation YAML</button>
+                <button id="schema-tab-tf" class="schema-tab">Terraform HCL</button>
+                <button id="schema-tab-pulumi" class="schema-tab">Pulumi (TypeScript)</button>
+            </div>
+            <div class="schema-code-wrapper">
+                <pre id="schema-code-output"></pre>
+            </div>
+            <div class="modal-footer">
+                <button id="schema-copy-btn" class="btn btn-primary">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Index Manager ─────────────────────────────────────── -->
+    <div id="indexes-overlay" class="modal-overlay hidden">
+        <div class="modal indexes-modal">
+            <div class="modal-header">
+                <div class="indexes-modal-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    <h3>Indexes — <span id="indexes-table-name-badge"></span></h3>
+                </div>
+                <button id="indexes-close-btn" class="modal-close-btn">✕</button>
+            </div>
+
+            <!-- Index cards list -->
+            <div id="indexes-list-view" class="indexes-list-view">
+                <div id="indexes-cards" class="indexes-cards"><!-- populated by JS --></div>
+                <div class="indexes-add-row">
+                    <button id="indexes-add-btn" class="btn-primary indexes-add-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add Global Secondary Index
+                    </button>
+                </div>
+            </div>
+
+            <!-- Create GSI form (hidden by default) -->
+            <div id="indexes-create-view" class="indexes-create-view hidden">
+                <div class="modal-header" style="border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:var(--bg-secondary);">
+                    <h4 style="margin:0; font-size:14px;">New Global Secondary Index</h4>
+                    <button id="indexes-cancel-create-btn" class="modal-close-btn" title="Cancel">✕</button>
+                </div>
+                <div class="indexes-create-body">
+                    <p id="indexes-create-error" class="form-error hidden"></p>
+
+                    <div class="form-group">
+                        <label>Index Name <span class="required">*</span></label>
+                        <input type="text" id="idx-create-name" placeholder="e.g. email-index" autocomplete="off" />
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Partition Key <span class="required">*</span></label>
+                            <input type="text" id="idx-create-pk-name" placeholder="Attribute name" autocomplete="off" />
+                        </div>
+                        <div class="form-group" style="flex:0 0 130px">
+                            <label>Type</label>
+                            <select id="idx-create-pk-type">
+                                <option value="S">String (S)</option>
+                                <option value="N">Number (N)</option>
+                                <option value="B">Binary (B)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>Sort Key <span style="color:var(--text-muted);font-weight:400;font-size:11px">optional</span></label>
+                            <input type="text" id="idx-create-sk-name" placeholder="Attribute name" autocomplete="off" />
+                        </div>
+                        <div class="form-group" style="flex:0 0 130px">
+                            <label>Type</label>
+                            <select id="idx-create-sk-type">
+                                <option value="S">String (S)</option>
+                                <option value="N">Number (N)</option>
+                                <option value="B">Binary (B)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Projection</label>
+                        <div class="projection-options">
+                            <label class="projection-opt"><input type="radio" name="idx-proj" value="ALL" checked /><div class="projection-opt-body"><span class="projection-opt-title">ALL</span><span class="projection-opt-desc">All attributes</span></div></label>
+                            <label class="projection-opt"><input type="radio" name="idx-proj" value="KEYS_ONLY" /><div class="projection-opt-body"><span class="projection-opt-title">KEYS_ONLY</span><span class="projection-opt-desc">Key attributes only</span></div></label>
+                            <label class="projection-opt"><input type="radio" name="idx-proj" value="INCLUDE" /><div class="projection-opt-body"><span class="projection-opt-title">INCLUDE</span><span class="projection-opt-desc">Specific attributes</span></div></label>
+                        </div>
+                    </div>
+
+                    <div id="idx-create-include-wrapper" class="form-group hidden">
+                        <label>Non-key attributes <span style="color:var(--text-muted);font-weight:400;font-size:11px">comma-separated</span></label>
+                        <input type="text" id="idx-create-non-key" placeholder="attr1, attr2, attr3" autocomplete="off" />
+                    </div>
+
+                    <div class="indexes-create-note">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        GSI creation is asynchronous — status shows as <strong>CREATING</strong> until active.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="indexes-cancel-create-btn2" class="btn-secondary">Cancel</button>
+                    <button id="indexes-submit-btn" class="btn-primary">Create GSI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Assume Role Login ───────────────────────────────── -->
+    <div id="assume-role-overlay" class="hidden">
+        <div id="assume-role-modal">
+            <div class="modal-header assume-role-header">
+                <div class="assume-role-title">
+                    <span class="assume-role-icon">🔐</span>
+                    <h3>AWS Assume Role</h3>
+                </div>
+                <button id="assume-role-close-btn" class="icon-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="assume-role-description">Authenticate using <code>sts:AssumeRole</code> to get temporary
+                    credentials for DynamoDB access.</p>
+                <div class="assume-role-form">
+                    <div class="form-group">
+                        <label for="ar-role-arn">Role ARN <span class="required">*</span></label>
+                        <input type="text" id="ar-role-arn" value="arn:aws:iam::763165854963:role/DevelopersRole"
+                            placeholder="arn:aws:iam::123456789012:role/RoleName" />
+                    </div>
+                    <div class="form-group">
+                        <label for="ar-session-name">Session Name</label>
+                        <input type="text" id="ar-session-name" value="dev-session" placeholder="my-session" />
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ar-region">Region</label>
+                            <select id="ar-region">
+                                <option value="us-east-1">us-east-1</option>
+                                <option value="us-east-2">us-east-2</option>
+                                <option value="us-west-1">us-west-1</option>
+                                <option value="us-west-2">us-west-2</option>
+                                <option value="eu-west-1">eu-west-1</option>
+                                <option value="eu-west-2">eu-west-2</option>
+                                <option value="eu-central-1">eu-central-1</option>
+                                <option value="ap-southeast-1">ap-southeast-1</option>
+                                <option value="ap-southeast-2">ap-southeast-2</option>
+                                <option value="ap-northeast-1">ap-northeast-1</option>
+                                <option value="ap-south-1">ap-south-1</option>
+                                <option value="sa-east-1">sa-east-1</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ar-profile">AWS Profile</label>
+                            <input type="text" id="ar-profile" value="default" placeholder="default" />
+                        </div>
+                    </div>
+                    <div id="ar-error" class="error-msg hidden"></div>
+                    <div class="assume-role-cmd-preview">
+                        <div class="cmd-label">Equivalent CLI command:</div>
+                        <code
+                            id="ar-cmd-preview">aws sts assume-role --role-arn arn:aws:iam::763165854963:role/DevelopersRole --role-session-name dev-session</code>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="ar-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="ar-login-btn" class="btn-assume-role-submit">
+                    <span class="btn-icon">🔐</span> Login & Connect
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Manage Profiles ────────────────────────────────── -->
+    <div id="manage-profiles-overlay" class="hidden">
+        <div id="manage-profiles-modal" class="modal-content">
+            <div class="modal-header">
+                <h3>Manage Profiles</h3>
+                <button id="manage-profiles-close-btn" class="icon-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="manage-profiles-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Modal: Import ───────────────────────────────────────────── -->
+    <div id="import-overlay" class="modal-overlay hidden">
+        <div class="modal import-modal">
+
+            <!-- Header -->
+            <div class="modal-header">
+                <div class="import-header-inner">
+                    <h3 id="import-modal-title">Import Data</h3>
+                    <div class="import-steps-indicator">
+                        <span class="import-step-dot active" data-step="1">1</span>
+                        <span class="import-step-line"></span>
+                        <span class="import-step-dot" data-step="2">2</span>
+                        <span class="import-step-line"></span>
+                        <span class="import-step-dot" data-step="3">3</span>
+                    </div>
+                </div>
+                <button id="import-close-btn" class="modal-close-btn">✕</button>
+            </div>
+
+            <!-- Step 1: File Select -->
+            <div id="import-step-1" class="import-step">
+                <div id="import-dropzone" class="import-dropzone">
+                    <div class="import-dropzone-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <p class="import-dropzone-text">Drop your file here or <span class="import-dropzone-link">browse</span></p>
+                    <p class="import-dropzone-formats">Supports JSON · CSV · Excel (.xlsx, .xls)</p>
+                    <input type="file" id="import-file-input" accept=".json,.csv,.xlsx,.xls" class="hidden" />
+                </div>
+                <div id="import-file-info" class="import-file-info hidden">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <div class="import-file-details">
+                        <span id="import-file-name" class="import-file-name"></span>
+                        <span id="import-file-meta" class="import-file-meta"></span>
+                    </div>
+                    <button id="import-file-clear-btn" class="btn-link import-file-clear">✕</button>
+                </div>
+                <!-- Target table selector -->
+                <div class="import-target-row">
+                    <label class="import-option-label">Target table</label>
+                    <select id="import-target-table" class="import-select"></select>
+                </div>
+                <!-- Sheet selector (Excel only) -->
+                <div id="import-sheet-selector" class="import-sheet-selector hidden">
+                    <label class="import-option-label">Sheet</label>
+                    <select id="import-sheet-select" class="import-select"></select>
+                </div>
+                <div class="modal-footer">
+                    <button id="import-cancel-btn" class="btn-secondary">Cancel</button>
+                    <button id="import-next-btn" class="btn-primary" disabled>Next →</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Column Mapping -->
+            <div id="import-step-2" class="import-step hidden">
+                <div class="import-preview-section">
+                    <div class="import-section-label">Preview <span id="import-preview-badge" class="badge"></span></div>
+                    <div class="import-preview-wrap">
+                        <table id="import-preview-table" class="import-preview-table"></table>
+                    </div>
+                </div>
+                <div class="import-mapping-section">
+                    <div class="import-section-label">Column Mapping</div>
+                    <div class="import-mapping-header">
+                        <span>Column</span>
+                        <span>Include</span>
+                        <span>Type in DynamoDB</span>
+                        <span>Rename to</span>
+                    </div>
+                    <div id="import-mapping-rows" class="import-mapping-rows"></div>
+                </div>
+                <div class="import-options-section">
+                    <div class="import-section-label">Options</div>
+                    <div class="import-options-grid">
+                        <label class="import-option-item">
+                            <input type="checkbox" id="import-opt-overwrite" checked />
+                            <span>Overwrite existing items (same key)</span>
+                        </label>
+                        <label class="import-option-item">
+                            <input type="checkbox" id="import-opt-skip-empty" checked />
+                            <span>Skip empty / null values</span>
+                        </label>
+                        <label class="import-option-item import-option-batch">
+                            <span>Batch size per request</span>
+                            <input type="number" id="import-opt-batch" value="500" min="25" max="5000" step="25" class="import-batch-input" />
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="import-back-btn" class="btn-secondary">← Back</button>
+                    <div class="import-footer-info">
+                        <span id="import-row-count-label" class="import-count-label"></span>
+                    </div>
+                    <button id="import-start-btn" class="btn-primary">Import</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Progress -->
+            <div id="import-step-3" class="import-step hidden">
+                <div class="import-progress-body">
+                    <div id="import-progress-icon" class="import-progress-icon running">
+                        <svg id="import-spinner" width="48" height="48" viewBox="0 0 50 50"><circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="100 28"/></svg>
+                        <svg id="import-done-icon" class="hidden" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        <svg id="import-error-icon" class="hidden" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    </div>
+                    <div class="import-progress-bar-wrap">
+                        <div id="import-progress-bar" class="import-progress-bar" style="width:0%"></div>
+                    </div>
+                    <p id="import-progress-label" class="import-progress-label">Preparing…</p>
+                    <div class="import-progress-stats">
+                        <div class="import-stat">
+                            <span class="import-stat-value" id="import-stat-done">0</span>
+                            <span class="import-stat-key">Imported</span>
+                        </div>
+                        <div class="import-stat">
+                            <span class="import-stat-value" id="import-stat-total">0</span>
+                            <span class="import-stat-key">Total</span>
+                        </div>
+                        <div class="import-stat">
+                            <span class="import-stat-value import-stat-error" id="import-stat-errors">0</span>
+                            <span class="import-stat-key">Errors</span>
+                        </div>
+                    </div>
+                    <div id="import-error-list" class="import-error-list hidden"></div>
+                </div>
+                <div class="modal-footer">
+                    <button id="import-abort-btn" class="btn-secondary">Abort</button>
+                    <button id="import-finish-btn" class="btn-primary hidden">Done</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ─── Modal: Code Generator ───────────────────────────────────── -->
+    <div id="code-gen-overlay" class="modal-overlay hidden">
+        <div class="modal code-gen-modal">
+            <div class="modal-header">
+                <div class="code-gen-title">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    <h3>Code Generator</h3>
+                    <span id="code-gen-table-badge" class="code-gen-table-badge"></span>
+                </div>
+                <button id="code-gen-close-btn" class="modal-close-btn">✕</button>
+            </div>
+
+            <div class="code-gen-lang-tabs">
+                <button class="code-gen-tab active" data-lang="nodejs">Node.js</button>
+                <button class="code-gen-tab" data-lang="python">Python</button>
+                <button class="code-gen-tab" data-lang="java">Java</button>
+                <button class="code-gen-tab" data-lang="csharp">C#</button>
+                <button class="code-gen-tab" data-lang="go">Go</button>
+                <button class="code-gen-tab" data-lang="ruby">Ruby</button>
+                <button class="code-gen-tab" data-lang="php">PHP</button>
+                <button class="code-gen-tab" data-lang="cli">AWS CLI</button>
+            </div>
+
+            <div class="code-gen-mode-row">
+                <button class="code-gen-mode-tab active" data-mode="current">Current Query</button>
+                <button class="code-gen-mode-tab" data-mode="crud">Full CRUD</button>
+                <div style="flex:1"></div>
+                <button id="code-gen-sdk-btn" class="code-gen-sdk-btn" title="Download complete SDK project as .zip">⬇ Download SDK</button>
+            </div>
+
+            <div class="code-gen-body">
+                <div class="code-gen-info-bar">
+                    <span id="code-gen-mode-badge" class="code-gen-mode-badge"></span>
+                    <span class="code-gen-hint" id="code-gen-hint-text"></span>
+                </div>
+                <div class="code-gen-code-wrap">
+                    <button id="code-gen-copy-btn" class="code-gen-copy-btn">Copy</button>
+                    <pre id="code-gen-output" class="code-gen-output"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Cost Analytics Panel ────────────────────────────────────── -->
+    <div id="cost-analytics-panel" class="cost-analytics-panel hidden">
+        <div class="cost-panel-header">
+            <div class="cost-panel-title">
+                <span>💰</span>
+                <h3>Cost Analytics</h3>
+                <span class="cost-panel-subtitle">Session cost tracker</span>
+            </div>
+            <div class="cost-panel-actions">
+                <button id="cost-reset-btn" class="cost-action-btn" title="Reset session stats">↺ Reset</button>
+                <button id="cost-panel-close" class="cost-panel-close" title="Close">✕</button>
+            </div>
+        </div>
+
+        <!-- Summary stats -->
+        <div class="cost-section">
+            <div class="cost-section-title">Session Overview</div>
+            <div id="cost-session-summary"></div>
+        </div>
+
+        <!-- Per-table breakdown -->
+        <div class="cost-section">
+            <div class="cost-section-title">Cost by Table</div>
+            <div id="cost-per-table"></div>
+        </div>
+
+        <!-- Alert threshold -->
+        <div class="cost-section">
+            <div class="cost-section-title">Cost Alert</div>
+            <div class="cost-threshold-row">
+                <span class="cost-threshold-label">Alert when session cost exceeds</span>
+                <div class="cost-threshold-inputs">
+                    <span class="cost-threshold-prefix">$</span>
+                    <input type="number" id="cost-threshold-input" class="cost-threshold-input" placeholder="0.01" min="0" step="0.001" />
+                    <button id="cost-threshold-btn" class="cost-action-btn">Set</button>
+                    <button id="cost-threshold-clear" class="cost-action-btn cost-action-danger">Clear</button>
+                </div>
+            </div>
+            <div id="cost-threshold-status" class="cost-threshold-status"></div>
+        </div>
+
+        <!-- Operation history -->
+        <div class="cost-section cost-section-history">
+            <div class="cost-section-title">Recent Operations <span class="cost-history-note">(last 50)</span></div>
+            <div id="cost-history" class="cost-history-wrap"></div>
+        </div>
+
+        <!-- Pricing reference -->
+        <div class="cost-pricing-footer">
+            Pricing: $0.00013 / RCU · $0.00065 / WCU (us-east-1, on-demand)
+        </div>
+    </div>
+
+    <!-- ─── Toast notifications ────────────────────────────────────── -->
+    <div id="toast-container"></div>
+
+    <!-- ─── Table Dashboard Panel ───────────────────────────────────── -->
+    <div id="dashboard-panel" class="dashboard-panel hidden">
+        <div class="dashboard-header">
+            <div class="dashboard-header-left">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                <strong>Dashboard</strong>
+                <span class="dash-table-name"></span>
+            </div>
+            <div class="dashboard-header-right">
+                <button id="dashboard-refresh-btn" class="icon-btn-sm" title="Refresh">🔄</button>
+                <button id="dashboard-close-btn" class="icon-btn-sm" title="Close">✕</button>
+            </div>
+        </div>
+        <div class="dash-body"></div>
+    </div>
+
+    <!-- ─── Item Template Editor Modal ──────────────────────────────── -->
+    <div id="template-editor-overlay" class="modal-overlay hidden">
+        <div class="modal template-editor-modal">
+            <div class="modal-header">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span>🧩</span>
+                    <h3>Item Template</h3>
+                    <span class="tpl-table-name code-gen-table-badge"></span>
+                </div>
+                <button id="template-editor-close" class="modal-close-btn">✕</button>
+            </div>
+            <div class="modal-body tpl-modal-body">
+                <p class="tpl-description">Defina os campos padrão para inserção de novos items. Campos com template usam formulário estruturado ao invés de JSON livre.</p>
+                <div id="template-fields-list" class="tpl-fields-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="template-add-field-btn" class="btn-ghost">＋ Adicionar Campo</button>
+                <div style="flex:1"></div>
+                <button id="template-delete-btn" class="btn-secondary" style="color:var(--danger)">🗑 Remover Template</button>
+                <button id="template-save-btn" class="btn-primary">💾 Salvar Template</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/lib/jszip.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
