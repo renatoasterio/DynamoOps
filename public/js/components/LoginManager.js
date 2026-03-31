@@ -495,7 +495,7 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
     }
 
     try {
-        await api('POST', '/assume-role', { roleArn, sessionName, region, profile });
+        const result = await api('POST', '/assume-role', { roleArn, sessionName, region, profile });
         trackRecentConnection({ roleArn, sessionName, region, awsProfile: profile, envTag });
         addRoleHistory({ roleArn, sessionName, region, awsProfile: profile, envTag });
 
@@ -504,20 +504,150 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
         config.profile  = profile;
         config.envTag   = envTag;
         showEnvBadge(envTag);
-        
+
         const connStatus = $('#conn-status');
         if (connStatus) {
             connStatus.className = 'status connected';
             connStatus.textContent = 'Connected';
         }
         document.dispatchEvent(new CustomEvent('roleAssumed', { detail: { roleArn } }));
-        
+
+        // Start expiration countdown using the STS-issued expiration time
+        if (result?.role?.expiration) {
+            startSessionExpirationTimer(result.role.expiration, roleArn, sessionName, region, profile, envTag);
+        }
+
         showToast(`Assumed role successfully!`, 'success');
         hideLogin();
         loadTables();
     } catch (err) {
         throw new Error(`Assume Role failed: ${err.message}`);
     }
+}
+
+// ─── Session expiration timer ─────────────────────────────────────────────────
+
+let _sessionTimerId   = null;
+let _sessionCounterId = null;
+
+function startSessionExpirationTimer(expiration, roleArn, sessionName, region, profile, envTag) {
+    // Clear any previous timers
+    clearInterval(_sessionTimerId);
+    clearInterval(_sessionCounterId);
+
+    const expiresAt  = new Date(expiration).getTime();
+    const WARN_MS    = 5 * 60 * 1000;  // warn 5 min before expiry
+    const warnAt     = expiresAt - WARN_MS;
+
+    // Update the role badge every second with a countdown
+    _sessionCounterId = setInterval(() => {
+        const remaining = expiresAt - Date.now();
+        if (remaining <= 0) {
+            clearInterval(_sessionCounterId);
+            return;
+        }
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        const badge = $('#role-badge-text');
+        if (badge) {
+            const roleName = roleArn.split('/').pop();
+            badge.textContent = `${roleName} (${mins}:${secs.toString().padStart(2, '0')})`;
+        }
+    }, 1000);
+
+    // Show renewal prompt when ≤5 min remain
+    _sessionTimerId = setTimeout(() => {
+        clearInterval(_sessionCounterId);
+        _showRenewalPrompt(roleArn, sessionName, region, profile, envTag);
+    }, Math.max(0, warnAt - Date.now()));
+}
+
+function _showRenewalPrompt(roleArn, sessionName, region, profile, envTag) {
+    const overlay = document.createElement('div');
+    overlay.id = 'session-renewal-overlay';
+    overlay.style.cssText = [
+        'position:fixed', 'inset:0', 'background:rgba(0,0,0,0.6)',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'z-index:9999'
+    ].join(';');
+
+    const parsed   = parseRoleArn(roleArn);
+    const roleName = parsed?.roleName || roleArn;
+
+    overlay.innerHTML = `
+      <div style="background:var(--bg-elevated);border:1px solid var(--border-strong);border-radius:16px;padding:28px 32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.5)">
+        <div style="font-size:32px;margin-bottom:12px">⏰</div>
+        <h3 style="color:var(--text-primary);font-size:16px;margin-bottom:8px">Sessão expirando</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:4px">A sessão <strong style="color:var(--accent)">${roleName}</strong> expira em menos de 5 minutos.</p>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:20px">Renove agora para continuar sem interrupção.</p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button id="session-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">🔄 Renovar Sessão</button>
+          <button id="session-dismiss-btn" style="background:none;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer">Ignorar</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('session-dismiss-btn').addEventListener('click', () => overlay.remove());
+
+    document.getElementById('session-renew-btn').addEventListener('click', async () => {
+        overlay.remove();
+        const btn = document.getElementById('session-renew-btn');
+        try {
+            await assumeRole(roleArn, sessionName || 'dev-session', region, profile, false, envTag);
+            showToast('Sessão renovada com sucesso!', 'success');
+        } catch (err) {
+            showToast(`Falha ao renovar: ${err.message}`, 'error');
+        }
+    });
+
+    // Hard-expire: if they didn't renew, show a blocking prompt after the session actually expires
+    setTimeout(() => {
+        if (!document.getElementById('session-renewal-overlay')) return;
+        overlay.remove();
+        _showSessionExpiredPrompt(roleArn, sessionName, region, profile, envTag);
+    }, WARN_MS + 10000);
+
+    const WARN_MS = 5 * 60 * 1000;
+}
+
+function _showSessionExpiredPrompt(roleArn, sessionName, region, profile, envTag) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = [
+        'position:fixed', 'inset:0', 'background:rgba(0,0,0,0.85)',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'z-index:9999'
+    ].join(';');
+
+    const parsed   = parseRoleArn(roleArn);
+    const roleName = parsed?.roleName || roleArn;
+
+    overlay.innerHTML = `
+      <div style="background:var(--bg-elevated);border:1px solid rgba(248,113,113,0.4);border-radius:16px;padding:28px 32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6)">
+        <div style="font-size:32px;margin-bottom:12px">🔒</div>
+        <h3 style="color:#f87171;font-size:16px;margin-bottom:8px">Sessão expirada</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">A sessão <strong>${roleName}</strong> expirou. Renove para continuar.</p>
+        <button id="session-expired-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%">🔄 Renovar Agora</button>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('session-expired-renew-btn').addEventListener('click', async () => {
+        overlay.remove();
+        try {
+            await assumeRole(roleArn, sessionName || 'dev-session', region, profile, false, envTag);
+            showToast('Sessão renovada!', 'success');
+        } catch (err) {
+            showToast(`Falha ao renovar: ${err.message}`, 'error');
+            // Fall back to login screen
+            logout();
+        }
+    });
+}
+
+export function clearSessionTimer() {
+    clearInterval(_sessionTimerId);
+    clearInterval(_sessionCounterId);
 }
 
 export function logout() {

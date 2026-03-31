@@ -21,6 +21,19 @@ class ItemController {
         }
     }
 
+    async updateAttribute(req, res) {
+        try {
+            const { key, attributeName, newValue } = req.body;
+            if (!key || !attributeName) {
+                return res.status(400).json({ error: 'key and attributeName are required' });
+            }
+            const result = await dynamoService.updateAttribute(req.clients, req.params.name, key, attributeName, newValue);
+            res.json({ success: true, consumedCapacity: result.consumedCapacity });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
     async batchWrite(req, res) {
         try {
             const { items } = req.body;

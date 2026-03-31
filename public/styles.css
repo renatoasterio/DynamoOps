@@ -3183,6 +3183,20 @@ header .logo strong {
     margin: 0;
 }
 
+.export-fetch-all-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.export-fetch-all-row input[type="checkbox"] {
+    cursor: pointer;
+}
+
 .modal-footer {
     display: flex;
     justify-content: flex-end;

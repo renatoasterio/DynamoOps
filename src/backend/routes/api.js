@@ -34,6 +34,7 @@ router.post('/execute-statement', (req, res) => tableController.executeStatement
 
 // ─── Items ────────────────────────────────────────────
 router.put('/tables/:name/items', (req, res) => itemController.put(req, res));
+router.patch('/tables/:name/items', (req, res) => itemController.updateAttribute(req, res));
 router.delete('/tables/:name/items', (req, res) => itemController.delete(req, res));
 router.post('/tables/:name/batch-write', (req, res) => itemController.batchWrite(req, res));
 

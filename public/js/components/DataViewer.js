@@ -512,13 +512,32 @@ function initExportModal() {
     noneBtn && noneBtn.addEventListener('click', () => setAllChecked(false));
     keysBtn && keysBtn.addEventListener('click', () => selectKeysOnly());
 
-    confirmBtn && confirmBtn.addEventListener('click', () => {
+    confirmBtn && confirmBtn.addEventListener('click', async () => {
         const selected = getSelectedFields();
         if (!selected.length) return showToast('Select at least one field', 'error');
+
+        const fetchAll = $('#export-fetch-all-cb')?.checked && state.lastQueryEndpoint && state.lastQueryParams;
+        let items = state.items;
+
+        if (fetchAll) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Fetching…';
+            try {
+                items = await fetchAllItemsForExport(confirmBtn);
+            } catch (err) {
+                showToast(`Export failed: ${err.message}`, 'error');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Export';
+                return;
+            }
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Export';
+        }
+
         if (exportFormat === 'csv') {
-            doExportCsv(selected);
+            doExportCsv(selected, items);
         } else {
-            doExportJson(selected);
+            doExportJson(selected, items);
         }
         close();
     });
@@ -560,7 +579,20 @@ function openExportModal(format) {
         cb.addEventListener('change', updateExportCount);
     });
 
-    $('#export-item-count').textContent = state.items.length;
+    const hasMorePages = !!state.lastEvaluatedKey && !!state.lastQueryEndpoint;
+    $('#export-item-count').textContent = hasMorePages
+        ? `${state.items.length}+ (more pages available)`
+        : state.items.length;
+    const fetchAllRow = $('#export-fetch-all-row');
+    if (fetchAllRow) {
+        if (hasMorePages) {
+            fetchAllRow.classList.remove('hidden');
+            const cb = $('#export-fetch-all-cb');
+            if (cb) cb.checked = true;
+        } else {
+            fetchAllRow.classList.add('hidden');
+        }
+    }
     overlay.classList.remove('hidden');
 }
 
@@ -590,8 +622,34 @@ function getSelectedFields() {
         .map(cb => cb.dataset.field);
 }
 
-function doExportJson(fields) {
-    const data = state.items.map(item => {
+async function fetchAllItemsForExport(progressBtn) {
+    const connection = getActiveTabConnection();
+    const endpoint = state.lastQueryEndpoint;
+    const baseParams = { ...state.lastQueryParams };
+    const isSql = endpoint === '/execute-statement';
+    const pageKey = isSql ? 'nextToken' : 'exclusiveStartKey';
+    const resultKey = isSql ? 'nextToken' : 'lastEvaluatedKey';
+
+    let allItems = [];
+    let continuationKey = null;
+    let page = 0;
+
+    do {
+        page++;
+        if (progressBtn) progressBtn.textContent = `Fetching… (${allItems.length} items)`;
+        const params = { ...baseParams };
+        if (continuationKey) params[pageKey] = continuationKey;
+        const result = await api('POST', endpoint, params, { connection });
+        allItems = allItems.concat(result.items || []);
+        continuationKey = result[resultKey] || null;
+    } while (continuationKey);
+
+    return allItems;
+}
+
+function doExportJson(fields, items) {
+    const src = items || state.items;
+    const data = src.map(item => {
         const out = {};
         fields.forEach(f => { if (f in item) out[f] = item[f]; });
         return out;
@@ -603,9 +661,10 @@ function doExportJson(fields) {
     showToast(`Exported ${data.length} items (${fields.length} fields) as JSON`, 'success');
 }
 
-function doExportCsv(fields) {
+function doExportCsv(fields, items) {
+    const src = items || state.items;
     const csvRows = [fields.join(',')];
-    state.items.forEach(item => {
+    src.forEach(item => {
         const values = fields.map(f => {
             const val = item[f];
             const s   = (val === null || val === undefined) ? '' : JSON.stringify(val);
@@ -617,7 +676,7 @@ function doExportCsv(fields) {
         new Blob([csvRows.join('\n')], { type: 'text/csv' }),
         `${state.currentTable}_data.csv`
     );
-    showToast(`Exported ${state.items.length} items (${fields.length} fields) as CSV`, 'success');
+    showToast(`Exported ${src.length} items (${fields.length} fields) as CSV`, 'success');
 }
 
 function downloadBlob(blob, filename) {
@@ -750,11 +809,16 @@ async function _applyInlineEdit(td, col, itemIdx, origVal, rawStr, origDisplay) 
     td.classList.remove('cell-editing');
     td.innerHTML = '<span class="cell-saving">saving…</span>';
 
+    // Build the primary key object from the current item
+    const keyNames = getKeyNames();
+    const key = {};
+    for (const k of keyNames) key[k] = currentItem[k];
+
     try {
         const connection = getActiveTabConnection();
         const _t0 = Date.now();
-        const result = await api('PUT', `/tables/${state.currentTable}/items`, { item: updatedItem }, { connection });
-        trackWrite(state.currentTable, result?.consumedCapacity, 'put', Date.now() - _t0, 1);
+        const result = await api('PATCH', `/tables/${state.currentTable}/items`, { key, attributeName: col, newValue: newVal }, { connection });
+        trackWrite(state.currentTable, result?.consumedCapacity, 'update', Date.now() - _t0, 1);
 
         // Update in-memory state
         const realIdx = state.items.indexOf(currentItem);

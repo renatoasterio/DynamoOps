@@ -14,10 +14,14 @@ export const state = {
     lastEvaluatedKey: null,
     nextToken: null, // For PartiQL pagination
     
-    viewMode: 'table', 
-    queryMode: 'scan', 
+    viewMode: 'table',
+    queryMode: 'scan',
     filterOpen: false,
     editingItem: null,
+
+    // Last executed query/scan params (without exclusiveStartKey) for full-table export
+    lastQueryEndpoint: null,
+    lastQueryParams: null,
 };
 
 export const config = {

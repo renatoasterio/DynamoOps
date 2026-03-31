@@ -14,6 +14,7 @@ const {
     ScanCommand: DocScanCommand,
     QueryCommand: DocQueryCommand,
     PutCommand,
+    UpdateCommand,
     DeleteCommand,
     BatchWriteCommand
 } = require('@aws-sdk/lib-dynamodb');
@@ -268,6 +269,27 @@ class DynamoService {
             nextToken: result.NextToken || null,
             consumedCapacity: result.ConsumedCapacity || null,
         };
+    }
+
+    async updateAttribute(clients, tableName, key, attributeName, newValue) {
+        const params = {
+            TableName: tableName,
+            Key: key,
+            ReturnConsumedCapacity: 'TOTAL',
+        };
+
+        if (newValue === undefined || newValue === null) {
+            // REMOVE the attribute entirely
+            params.UpdateExpression = 'REMOVE #attr';
+            params.ExpressionAttributeNames = { '#attr': attributeName };
+        } else {
+            params.UpdateExpression = 'SET #attr = :val';
+            params.ExpressionAttributeNames = { '#attr': attributeName };
+            params.ExpressionAttributeValues = { ':val': newValue };
+        }
+
+        const result = await clients.docClient.send(new UpdateCommand(params));
+        return { consumedCapacity: result.ConsumedCapacity || null };
     }
 
     async putItem(clients, tableName, item) {

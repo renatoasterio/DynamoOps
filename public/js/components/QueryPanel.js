@@ -611,6 +611,9 @@ export async function executeQuery(append = false, forcedStartKey) {
 
             const params = { keyConditionExpression, expressionAttributeNames, expressionAttributeValues, limit };
             if (indexName) params.indexName = indexName;
+            // Save base params for full-table export (no pagination key)
+            state.lastQueryEndpoint = `/tables/${state.currentTable}/query`;
+            state.lastQueryParams = { ...params };
             const qStartKey = forcedStartKey !== undefined ? forcedStartKey : (append ? state.lastEvaluatedKey : null);
             if (qStartKey) params.exclusiveStartKey = qStartKey;
 
@@ -626,6 +629,9 @@ export async function executeQuery(append = false, forcedStartKey) {
             }
             
             const params = { statement };
+            // Save base params for full-table export (no pagination token)
+            state.lastQueryEndpoint = `/execute-statement`;
+            state.lastQueryParams = { statement };
             if (append && state.nextToken) {
                 params.nextToken = state.nextToken;
             }
@@ -639,8 +645,6 @@ export async function executeQuery(append = false, forcedStartKey) {
             }
         } else {
             const params = { limit };
-            const startKey = forcedStartKey !== undefined ? forcedStartKey : (append ? state.lastEvaluatedKey : null);
-            if (startKey) params.exclusiveStartKey = startKey;
 
             const filterExpr = dom.scanFilterExpr.value.trim();
             if (filterExpr) {
@@ -656,6 +660,12 @@ export async function executeQuery(append = false, forcedStartKey) {
                     catch { showToast('Invalid JSON in Expression Attribute Values', 'error'); }
                 }
             }
+
+            // Save base params for full-table export (no pagination key)
+            state.lastQueryEndpoint = `/tables/${state.currentTable}/scan`;
+            state.lastQueryParams = { ...params };
+            const startKey = forcedStartKey !== undefined ? forcedStartKey : (append ? state.lastEvaluatedKey : null);
+            if (startKey) params.exclusiveStartKey = startKey;
 
             result = await api('POST', `/tables/${state.currentTable}/scan`, params, { connection });
             if (!append) addToHistory('scan', params);
