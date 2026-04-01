@@ -9,6 +9,64 @@ class LicenseManager {
     async init() {
         this._status = await this._fetchStatus();
         this._renderBadge();
+        this._applyPlanToUI();
+    }
+
+    // ─── Plan hierarchy ───────────────────────────────────────────────
+    _planLevel(plan) {
+        return { free: 0, pro: 1, pro_plus: 2, team: 3 }[plan] ?? 0;
+    }
+
+    _hasPlan(required) {
+        const current = this._status?.plan || 'free';
+        return this._planLevel(current) >= this._planLevel(required);
+    }
+
+    // ─── Apply plan restrictions to the UI ───────────────────────────
+    // Each entry: { id, requiredPlan, action }
+    // action 'hide'    → display:none (feature doesn't exist for this plan)
+    // action 'disable' → disabled + title hint (visible but not clickable)
+    _applyPlanToUI() {
+        const rules = [
+            // ── Pro features ─────────────────────────────────────────
+            { id: 'add-item-btn',        required: 'pro', action: 'hide' },
+            { id: 'template-btn',        required: 'pro', action: 'hide' },
+            { id: 'import-btn',          required: 'pro', action: 'hide' },
+            { id: 'export-json-btn',     required: 'pro', action: 'hide' },
+            { id: 'export-csv-btn',      required: 'pro', action: 'hide' },
+            { id: 'cost-panel-btn',      required: 'pro', action: 'hide' },
+            { id: 'stream-toggle-btn',   required: 'pro', action: 'hide' },
+            { id: 'create-table-btn',    required: 'pro', action: 'hide' },
+            { id: 'delete-table-btn',    required: 'pro', action: 'hide' },
+            { id: 'truncate-table-btn',  required: 'pro', action: 'hide' },
+            // ── Pro+ features ────────────────────────────────────────
+            { id: 'schema-export-btn',   required: 'pro_plus', action: 'hide' },
+            { id: 'indexes-btn',         required: 'pro_plus', action: 'hide' },
+            { id: 'code-gen-btn',        required: 'pro_plus', action: 'hide' },
+        ];
+
+        for (const { id, required, action } of rules) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+
+            if (this._hasPlan(required)) {
+                // Restore — remove any previous restriction
+                el.style.display = '';
+                el.disabled = false;
+                if (el.dataset.originalTitle) {
+                    el.title = el.dataset.originalTitle;
+                    delete el.dataset.originalTitle;
+                }
+            } else {
+                if (action === 'hide') {
+                    el.style.display = 'none';
+                } else {
+                    el.disabled = true;
+                    if (!el.dataset.originalTitle) el.dataset.originalTitle = el.title || '';
+                    el.title = `Requires ${required.replace('_', '+')} plan — click badge to upgrade`;
+                }
+            }
+        }
     }
 
     async _fetchStatus() {
@@ -143,6 +201,7 @@ class LicenseManager {
                 modal.remove();
                 this._status = await this._fetchStatus();
                 this._renderBadge();
+                this._applyPlanToUI();
             } else {
                 btn.textContent = 'Activate';
                 btn.disabled = false;
@@ -161,6 +220,7 @@ class LicenseManager {
                 modal.remove();
                 this._status = await this._fetchStatus();
                 this._renderBadge();
+                this._applyPlanToUI();
             } else {
                 btn.textContent = 'Deactivate License';
                 btn.disabled = false;
