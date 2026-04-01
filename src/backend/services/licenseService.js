@@ -1,22 +1,23 @@
 'use strict';
 
-const path   = require('path');
-const fs     = require('fs');
-const os     = require('os');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const crypto = require('crypto');
 
 const { jwtVerify, importSPKI } = require('jose');
-const { machineIdSync }         = require('node-machine-id');
+const { machineIdSync } = require('node-machine-id');
 
-// ─── Public key (injected at build time via env or replaced in binary) ────────
+// ─── Public key (injected at build time via env or hardcoded fallback) ────────
 const PUBLIC_KEY_PEM = process.env.DYNAMO_LICENSE_PUBLIC_KEY ||
 `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPLACE_HOLDER_PUBLIC_KEY_HERE==
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE673tPiicD0RkTKuA/6+J3KB+v8Oe
+m3nntZKcD6Fvr7A3xjB0k2uKF0GylK4gOqpAgTvAl7i2cX53qtk4Myoo4g==
 -----END PUBLIC KEY-----`;
 
-const GRACE_PERIOD_MS    = 7 * 24 * 60 * 60 * 1000; // 7 days
+const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const REFRESH_TIMEOUT_MS = 5_000;
-const PLAN_HIERARCHY     = ['free', 'pro', 'pro_plus', 'team'];
+const PLAN_HIERARCHY = ['free', 'pro', 'pro_plus', 'team'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -86,8 +87,8 @@ async function verifyToken(rawJwt) {
         return { plan: 'free' };
     }
 
-    const now      = Date.now();
-    const expMs    = payload.exp ? payload.exp * 1000 : null;
+    const now = Date.now();
+    const expMs = payload.exp ? payload.exp * 1000 : null;
     const isExpired = expMs && now > expMs;
 
     if (isExpired) {
@@ -108,13 +109,13 @@ function buildStatus(payload, rawJwt, expMs, gracePeriod) {
         : null;
 
     return {
-        plan:              payload.plan  || 'free',
-        email:             payload.email || null,
-        key:               payload.key   || null,
-        expiresAt:         expMs         || null,
+        plan: payload.plan || 'free',
+        email: payload.email || null,
+        key: payload.key || null,
+        expiresAt: expMs || null,
         daysUntilRenewal,
         gracePeriod,
-        _rawToken:         rawJwt,
+        _rawToken: rawJwt,
     };
 }
 
@@ -134,7 +135,7 @@ async function getLicenseStatus() {
  * Returns true if currentPlan >= requiredPlan in hierarchy: free < pro < pro_plus < team
  */
 function planMeetsRequirement(currentPlan, requiredPlan) {
-    const currentIdx  = PLAN_HIERARCHY.indexOf(currentPlan);
+    const currentIdx = PLAN_HIERARCHY.indexOf(currentPlan);
     const requiredIdx = PLAN_HIERARCHY.indexOf(requiredPlan);
     if (currentIdx === -1 || requiredIdx === -1) return false;
     return currentIdx >= requiredIdx;
@@ -150,13 +151,14 @@ async function refreshLicense() {
     try {
         const machineId = getCurrentMachineId();
         const controller = new AbortController();
-        const timer      = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
+        const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
 
-        const res = await fetch('https://dynamoops.io/api/license/refresh', {
-            method:  'POST',
+        const baseUrl = process.env.LICENSE_SERVER_URL || 'https://dynamoops.io';
+        const res = await fetch(`${baseUrl}/api/license/refresh`, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ token: rawJwt, machineId }),
-            signal:  controller.signal,
+            body: JSON.stringify({ token: rawJwt, machineId }),
+            signal: controller.signal,
         });
         clearTimeout(timer);
 
