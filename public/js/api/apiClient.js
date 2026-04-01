@@ -25,6 +25,10 @@ export async function api(method, path, body = null, options = {}) {
     }
     
     if (!res.ok) {
+        if (res.status === 402) {
+            window.licenseManager?.showUpgradeModal(data.requiredPlan);
+            throw new Error(data.error || 'Plan upgrade required');
+        }
         throw new Error((data && data.error) || 'Unknown API error');
     }
     return data;

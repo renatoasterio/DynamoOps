@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
 const path = require('path');
 
 const isMac  = process.platform === 'darwin';
@@ -23,6 +23,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             devTools: !isProd,   // DevTools only available in development
+            preload: path.join(__dirname, 'preload.js'),
         },
         show: false,
     };
@@ -130,6 +131,61 @@ function createMenu() {
 
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+// ─── License IPC ──────────────────────────────────────────────────────
+const licenseService  = require('./src/backend/services/licenseService');
+const { machineIdSync } = require('node-machine-id');
+
+ipcMain.handle('license:status', async () => {
+    return await licenseService.getLicenseStatus();
+});
+
+ipcMain.handle('license:activate', async (_, { key }) => {
+    try {
+        const machineId = require('crypto')
+            .createHash('sha256')
+            .update(machineIdSync({ original: true }))
+            .digest('hex');
+
+        const res = await fetch('https://dynamoops.io/api/license/activate', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ key, machineId }),
+            signal:  AbortSignal.timeout(10000),
+        });
+
+        const data = await res.json();
+        if (!res.ok) return { success: false, error: data.error };
+
+        await licenseService.saveLicense(data.token);
+        return { success: true, plan: data.plan, email: data.email };
+    } catch (err) {
+        return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+ipcMain.handle('license:deactivate', async () => {
+    try {
+        const status = await licenseService.getLicenseStatus();
+        if (status.plan !== 'free') {
+            const machineId = require('crypto')
+                .createHash('sha256')
+                .update(machineIdSync({ original: true }))
+                .digest('hex');
+            // Best-effort deactivation on server
+            await fetch('https://dynamoops.io/api/license/deactivate', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ token: status._rawToken, machineId }),
+                signal:  AbortSignal.timeout(5000),
+            }).catch(() => {});
+        }
+        await licenseService.deactivateLicense();
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
 
 // ─── App lifecycle ───────────────────────────────────────────────────
 app.whenReady().then(() => {

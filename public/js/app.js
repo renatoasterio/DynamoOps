@@ -45,6 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initItemTemplateManager();
     initKeyboardManager();
 
+    // Initialize license manager
+    if (window.licenseManager) {
+        window.licenseManager.init();
+    }
+
     // Load initial AWS config if server has credentials cached
     fetchInitialConfig();
 });

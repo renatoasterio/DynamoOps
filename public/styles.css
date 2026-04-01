@@ -4558,3 +4558,53 @@ td.cell-editing {
 
 /* Session name — optional, visually de-emphasized */
 .ar-session-group label { opacity: 0.7; }
+
+/* ─── License Plan Badge ─────────────────────────────── */
+.plan-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.plan-badge:hover { opacity: 0.8; }
+.badge-plan-free    { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
+.badge-plan-pro     { background: rgba(99,102,241,0.2);  color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); }
+.badge-plan-proplus { background: rgba(168,85,247,0.2);  color: #d8b4fe; border: 1px solid rgba(168,85,247,0.4); }
+.badge-plan-team    { background: rgba(245,158,11,0.2);  color: #fcd34d; border: 1px solid rgba(245,158,11,0.4); }
+
+/* ─── License / Upgrade Modals ──────────────────────── */
+.upgrade-modal-box, .license-modal-box {
+    background: var(--surface, #1a1d2e);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 32px;
+    width: 440px;
+    max-width: 95vw;
+}
+.upgrade-modal-icon { font-size: 40px; text-align: center; margin-bottom: 12px; }
+.upgrade-modal-box h3, .license-modal-box h3 { margin: 0 0 8px; font-size: 18px; color: var(--text-primary, #e2e8f0); }
+.upgrade-modal-box p  { color: var(--text-secondary, #94a3b8); margin: 0 0 24px; line-height: 1.5; }
+.upgrade-modal-actions { display: flex; gap: 12px; justify-content: center; }
+
+.license-status-section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.license-current-plan { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.license-current-plan .label { font-size: 13px; color: var(--text-secondary, #94a3b8); }
+.license-email, .license-renews { font-size: 13px; color: var(--text-secondary, #94a3b8); margin-top: 4px; }
+.license-warning { font-size: 12px; color: #fcd34d; background: rgba(245,158,11,0.1); border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
+
+.license-hint { font-size: 13px; color: var(--text-secondary, #94a3b8); margin: 0 0 12px; }
+.license-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.license-key-input { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.license-get-key { font-size: 12px; color: var(--text-muted, #64748b); margin-top: 12px; }
+.license-get-key a { color: #818cf8; text-decoration: none; }
+.license-get-key a:hover { text-decoration: underline; }
+.license-error { font-size: 12px; color: #f87171; margin-top: 6px; padding: 6px 10px; background: rgba(248,113,113,0.1); border-radius: 6px; }
+
+.license-deactivate-section { text-align: center; }
+.btn-danger { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
+.btn-danger:hover { background: rgba(239,68,68,0.25); }
