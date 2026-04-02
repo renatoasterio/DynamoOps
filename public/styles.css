@@ -1444,12 +1444,16 @@ header .logo strong {
     padding: 8px 14px;
     border-bottom: 1px solid var(--border-subtle);
     color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     transition: background var(--transition-fast);
+}
+
+.cell-value {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 #data-table tr:hover td {
@@ -3643,15 +3647,27 @@ header .logo strong {
 .legend-modified { color: #ca8a04; }
 
 /* ─── Inline Cell Editing ─────────────────────────────────────────────────── */
+td.cell-data:not(.cell-key) {
+    position: relative;
+}
 td.cell-data:not(.cell-key):hover {
-    background: rgba(99, 102, 241, 0.05);
+    background: rgba(99, 102, 241, 0.08);
     cursor: text;
 }
 td.cell-data:not(.cell-key):hover::after {
-    content: ' ✎';
-    font-size: 10px;
+    content: '✎';
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    font-size: 13px;
+    line-height: 1;
     color: var(--accent);
-    opacity: 0.6;
+    opacity: 1;
+    background: rgba(99, 102, 241, 0.18);
+    border-radius: 3px;
+    padding: 2px 5px;
+    pointer-events: none;
 }
 td.cell-key { cursor: default; }
 td.cell-editing {

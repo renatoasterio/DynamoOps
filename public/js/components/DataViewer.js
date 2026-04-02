@@ -353,7 +353,7 @@ function renderTableView(items = state.items) {
             const display = val === undefined ? '' : formatCellValue(val);
             const isKey = keyNames.includes(col);
             const titleVal = escapeHtml(JSON.stringify(val) ?? '');
-            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${col}" title="${titleVal}">${display}</td>`;
+            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${col}" title="${titleVal}"><div class="cell-value">${display}</div></td>`;
         });
         tbody += '</tr>';
     });
@@ -825,7 +825,7 @@ async function _applyInlineEdit(td, col, itemIdx, origVal, rawStr, origDisplay) 
         if (realIdx !== -1) state.items[realIdx] = updatedItem;
         lastSorted[itemIdx] = updatedItem;
 
-        td.innerHTML = newVal === undefined ? '' : formatCellValue(newVal);
+        td.innerHTML = `<div class="cell-value">${newVal === undefined ? '' : formatCellValue(newVal)}</div>`;
         td.title     = escapeHtml(JSON.stringify(newVal) ?? '');
         showToast(`"${col}" atualizado`, 'success');
     } catch (err) {
