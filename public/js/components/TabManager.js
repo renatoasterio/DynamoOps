@@ -49,6 +49,7 @@ export async function openTab(tableName) {
         queryMode: 'scan',
         filterOpen: false,
         queryState: null, // Will be populated on switch
+        searchTerm: '',
         viewMode: 'table',
         connection: { ...config } // Capture current connection
     };
@@ -86,7 +87,9 @@ export async function switchTab(tabId) {
             currentTab.queryMode = state.queryMode;
             currentTab.filterOpen = state.filterOpen;
             currentTab.viewMode = state.viewMode;
-            
+            const searchInput = document.querySelector('#table-search-input');
+            currentTab.searchTerm = searchInput ? searchInput.value : '';
+
             document.dispatchEvent(new CustomEvent('saveTabStateRequest', { detail: { tab: currentTab } }));
         }
     }
@@ -110,11 +113,13 @@ export async function switchTab(tabId) {
     renderTabs();
     updateMainContentVisibility();
 
+    // Restore search input per-tab
+    const searchInput = document.querySelector('#table-search-input');
+    if (searchInput) searchInput.value = nextTab.searchTerm || '';
+
     if (state.tableInfo) {
         document.dispatchEvent(new CustomEvent('populateQueryFieldsRequest', { detail: { table: state.tableInfo } }));
-        if (nextTab.queryState) {
-            document.dispatchEvent(new CustomEvent('setQueryStateRequest', { detail: { queryState: nextTab.queryState } }));
-        }
+        document.dispatchEvent(new CustomEvent('setQueryStateRequest', { detail: { queryState: nextTab.queryState } }));
         document.dispatchEvent(new CustomEvent('renderDataRequest'));
     }
 

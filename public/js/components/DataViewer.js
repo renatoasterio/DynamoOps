@@ -63,7 +63,9 @@ export function initDataViewer() {
     }
 
     document.addEventListener('renderDataRequest', () => {
-        renderData();
+        const term = dom.searchInput ? dom.searchInput.value.toLowerCase() : '';
+        if (term) filterAndRender(term);
+        else renderData();
     });
 
     document.addEventListener('resetDataViewerRequest', () => {
@@ -126,6 +128,7 @@ export function resetDataViewer() {
     sortCol   = null;
     sortDir   = null;
     colWidths = {};
+    if (dom.searchInput) dom.searchInput.value = '';
     const pc = $('#pagination-controls');
     if (pc) pc.classList.add('hidden');
     const ri = $('#result-info');
