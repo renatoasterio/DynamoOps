@@ -441,9 +441,9 @@ function resolveRoleArn() {
  * connect / assume-role starts with a clean slate.  Called automatically before
  * every new connection attempt.
  */
-function resetPreviousSession() {
+async function resetPreviousSession() {
     if (state.connected) {
-        api('POST', '/disconnect').catch(() => {});
+        try { await api('POST', '/disconnect'); } catch (_) { /* ignore */ }
     }
     clearSessionTimer();
 
@@ -455,15 +455,29 @@ function resetPreviousSession() {
     state.allColumns = [];
     state.lastEvaluatedKey = null;
     state.nextToken = null;
+    state.lastQueryEndpoint = null;
+    state.lastQueryParams = null;
+    state.connected = false;
+    state.tables = [];
+
+    // Reset frontend connection config to prevent stale values
+    config.region   = 'us-east-1';
+    config.profile  = 'default';
+    config.endpoint = '';
+    config.envTag   = 'none';
 
     const tabBar = $('#tab-bar');
     if (tabBar) { tabBar.innerHTML = ''; tabBar.classList.add('hidden'); }
+
+    // Clear sidebar
+    const tableList = $('#table-list');
+    if (tableList) tableList.innerHTML = '';
 
     document.dispatchEvent(new CustomEvent('resetDataViewerRequest'));
 }
 
 async function connectWithParams(region, profile, endpoint, allowSave = false, envTag = 'none') {
-    resetPreviousSession();
+    await resetPreviousSession();
 
     if (allowSave && dom.saveCheckbox && dom.saveCheckbox.checked) {
         const profileName = dom.profileNameInput ? dom.profileNameInput.value.trim() : null;
@@ -510,7 +524,7 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
 
 async function assumeRole(roleArn, sessionName, region, profile, allowSave = false, envTag = 'none') {
     if (!roleArn) throw new Error('Informe o Account ID e Role Name, ou cole o Role ARN completo.');
-    resetPreviousSession();
+    await resetPreviousSession();
 
     if (allowSave && dom.arSaveCheckbox && dom.arSaveCheckbox.checked) {
         const profileName = dom.arNameInput ? dom.arNameInput.value.trim() : null;
@@ -524,7 +538,7 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
     }
 
     try {
-        const result = await api('POST', '/assume-role', { roleArn, sessionName, region, profile });
+        const result = await api('POST', '/assume-role', { roleArn, sessionName, region, profile, endpoint: '' });
         trackRecentConnection({ roleArn, sessionName, region, awsProfile: profile, envTag });
         addRoleHistory({ roleArn, sessionName, region, awsProfile: profile, envTag });
 

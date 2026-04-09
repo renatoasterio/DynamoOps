@@ -117,9 +117,12 @@ export async function switchTab(tabId) {
     const searchInput = document.querySelector('#table-search-input');
     if (searchInput) searchInput.value = nextTab.searchTerm || '';
 
+    // Always clear/restore query panel filters — even when tableInfo is null
+    // (new tabs). Without this, the previous tab's filters leak into the UI.
+    document.dispatchEvent(new CustomEvent('setQueryStateRequest', { detail: { queryState: nextTab.queryState } }));
+
     if (state.tableInfo) {
         document.dispatchEvent(new CustomEvent('populateQueryFieldsRequest', { detail: { table: state.tableInfo } }));
-        document.dispatchEvent(new CustomEvent('setQueryStateRequest', { detail: { queryState: nextTab.queryState } }));
         document.dispatchEvent(new CustomEvent('renderDataRequest'));
     }
 
