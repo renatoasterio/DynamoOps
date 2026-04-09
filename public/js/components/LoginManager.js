@@ -436,7 +436,35 @@ function resolveRoleArn() {
     throw new Error('Informe o Account ID e Role Name, ou cole o Role ARN completo.');
 }
 
+/**
+ * Resets all client + server state from a previous connection so that a fresh
+ * connect / assume-role starts with a clean slate.  Called automatically before
+ * every new connection attempt.
+ */
+function resetPreviousSession() {
+    if (state.connected) {
+        api('POST', '/disconnect').catch(() => {});
+    }
+    clearSessionTimer();
+
+    state.tabs = [];
+    state.activeTabId = null;
+    state.currentTable = null;
+    state.tableInfo = null;
+    state.items = [];
+    state.allColumns = [];
+    state.lastEvaluatedKey = null;
+    state.nextToken = null;
+
+    const tabBar = $('#tab-bar');
+    if (tabBar) { tabBar.innerHTML = ''; tabBar.classList.add('hidden'); }
+
+    document.dispatchEvent(new CustomEvent('resetDataViewerRequest'));
+}
+
 async function connectWithParams(region, profile, endpoint, allowSave = false, envTag = 'none') {
+    resetPreviousSession();
+
     if (allowSave && dom.saveCheckbox && dom.saveCheckbox.checked) {
         const profileName = dom.profileNameInput ? dom.profileNameInput.value.trim() : null;
         if (profileName) {
@@ -482,6 +510,7 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
 
 async function assumeRole(roleArn, sessionName, region, profile, allowSave = false, envTag = 'none') {
     if (!roleArn) throw new Error('Informe o Account ID e Role Name, ou cole o Role ARN completo.');
+    resetPreviousSession();
 
     if (allowSave && dom.arSaveCheckbox && dom.arSaveCheckbox.checked) {
         const profileName = dom.arNameInput ? dom.arNameInput.value.trim() : null;

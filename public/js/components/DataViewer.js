@@ -519,7 +519,7 @@ function initExportModal() {
         const selected = getSelectedFields();
         if (!selected.length) return showToast('Select at least one field', 'error');
 
-        const fetchAll = $('#export-fetch-all-cb')?.checked && state.lastQueryEndpoint && state.lastQueryParams;
+        const fetchAll = $('#export-fetch-all-cb')?.checked;
         let items = state.items;
 
         if (fetchAll) {
@@ -588,13 +588,10 @@ function openExportModal(format) {
         : state.items.length;
     const fetchAllRow = $('#export-fetch-all-row');
     if (fetchAllRow) {
-        if (hasMorePages) {
-            fetchAllRow.classList.remove('hidden');
-            const cb = $('#export-fetch-all-cb');
-            if (cb) cb.checked = true;
-        } else {
-            fetchAllRow.classList.add('hidden');
-        }
+        // Always show the option — allows exporting the entire table via full scan
+        fetchAllRow.classList.remove('hidden');
+        const cb = $('#export-fetch-all-cb');
+        if (cb) cb.checked = hasMorePages; // auto-check only when pagination pending
     }
     overlay.classList.remove('hidden');
 }
@@ -627,18 +624,22 @@ function getSelectedFields() {
 
 async function fetchAllItemsForExport(progressBtn) {
     const connection = getActiveTabConnection();
-    const endpoint = state.lastQueryEndpoint;
-    const baseParams = { ...state.lastQueryParams };
+
+    // If no previous query was executed, do a clean full-table scan
+    const endpoint  = state.lastQueryEndpoint || `/tables/${state.currentTable}/scan`;
+    const baseParams = state.lastQueryParams ? { ...state.lastQueryParams } : {};
+
     const isSql = endpoint === '/execute-statement';
     const pageKey = isSql ? 'nextToken' : 'exclusiveStartKey';
     const resultKey = isSql ? 'nextToken' : 'lastEvaluatedKey';
 
+    // Remove the page-size limit so each request brings back more items
+    if (!isSql && !baseParams.limit) baseParams.limit = 1000;
+
     let allItems = [];
     let continuationKey = null;
-    let page = 0;
 
     do {
-        page++;
         if (progressBtn) progressBtn.textContent = `Fetching… (${allItems.length} items)`;
         const params = { ...baseParams };
         if (continuationKey) params[pageKey] = continuationKey;
