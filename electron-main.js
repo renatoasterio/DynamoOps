@@ -17,7 +17,7 @@ function createWindow() {
         height: 900,
         minWidth: 900,
         minHeight: 600,
-        title: 'DynamoDB GUI',
+        title: 'DynamoOps',
         backgroundColor: '#0c0e14',
         webPreferences: {
             nodeIntegration: false,

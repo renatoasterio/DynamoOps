@@ -28,6 +28,24 @@ function showEnvBadge(envTag) {
     badge.className   = `env-badge env-badge-${envTag}`;
 }
 
+function updateConnInfoBadge(region, endpoint) {
+    const badge    = $('#conn-info-badge');
+    const provider = $('#conn-info-provider');
+    const regionEl = $('#conn-info-region');
+    if (!badge || !provider || !regionEl) return;
+
+    const isLocal = endpoint && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1') || endpoint.includes('localstack'));
+    provider.textContent = isLocal ? '⚡ LocalStack' : '☁ AWS';
+    provider.className   = `conn-info-provider ${isLocal ? 'provider-localstack' : 'provider-aws'}`;
+    regionEl.textContent = region || '';
+    badge.classList.remove('hidden');
+}
+
+function hideConnInfoBadge() {
+    const badge = $('#conn-info-badge');
+    if (badge) badge.classList.add('hidden');
+}
+
 const dom = {
     screen: null,
     tabs: null,
@@ -500,20 +518,21 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
         config.endpoint  = endpoint;
         config.envTag    = envTag;
         showEnvBadge(envTag);
-        
+        updateConnInfoBadge(region, endpoint);
+
         const regionSel = $('#region-select');
         const profileInp = $('#profile-input');
         const endpointInp = $('#endpoint-input');
         if (regionSel) regionSel.value = region;
         if (profileInp) profileInp.value = profile;
         if (endpointInp) endpointInp.value = endpoint;
-        
+
         const connStatus = $('#conn-status');
         if (connStatus) {
             connStatus.className = 'status connected';
             connStatus.textContent = 'Connected';
         }
-        
+
         showToast(`Connected to ${region}`, 'success');
         hideLogin();
         loadTables();
@@ -547,6 +566,7 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
         config.profile  = profile;
         config.envTag   = envTag;
         showEnvBadge(envTag);
+        updateConnInfoBadge(region, '');
 
         const connStatus = $('#conn-status');
         if (connStatus) {
@@ -729,8 +749,9 @@ export function logout() {
     const roleBadge = $('#role-badge');
     if (roleBadge) roleBadge.classList.add('hidden');
 
-    // Clear env badge
+    // Clear env badge and connection info
     showEnvBadge('none');
+    hideConnInfoBadge();
     config.envTag = 'none';
 
     showLogin();

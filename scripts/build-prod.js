@@ -86,7 +86,7 @@ function rmDir(dir) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-console.log('\n📦  DynamoDB GUI — Production Build\n');
+console.log('\n📦  DynamoOps — Production Build\n');
 
 // 1. Clean & create staging
 console.log('1/5  Creating staging directory…');

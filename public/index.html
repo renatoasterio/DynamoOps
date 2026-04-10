@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DynamoDB GUI — Visual Database Manager</title>
+    <title>DynamoOps — Visual Database Manager</title>
     <meta name="description"
         content="Visual GUI tool for AWS DynamoDB — query, insert, update and delete items with a beautiful interface." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -34,7 +34,7 @@
                         </defs>
                     </svg>
                 </div>
-                <h1>DynamoDB GUI</h1>
+                <h1>DynamoOps</h1>
                 <p>Visual Database Manager</p>
             </div>
 
@@ -73,8 +73,10 @@
                         <div class="env-picker" id="login-env-picker">
                             <button type="button" class="env-pick-btn env-pick-none active" data-env="none">None</button>
                             <button type="button" class="env-pick-btn env-pick-dev" data-env="dev">Dev</button>
+                            <button type="button" class="env-pick-btn env-pick-qa" data-env="qa">QA</button>
                             <button type="button" class="env-pick-btn env-pick-staging" data-env="staging">Staging</button>
                             <button type="button" class="env-pick-btn env-pick-prod" data-env="prod">Prod</button>
+                            <button type="button" class="env-pick-btn env-pick-local" data-env="local">Local</button>
                         </div>
                     </div>
 
@@ -189,10 +191,14 @@
                     </linearGradient>
                 </defs>
             </svg>
-            <span>DynamoDB <strong>GUI</strong></span>
+            <span>Dynamo<strong>Ops</strong></span>
         </div>
-        
+
         <div id="header-actions">
+            <div id="conn-info-badge" class="conn-info-badge hidden">
+                <span id="conn-info-provider" class="conn-info-provider"></span>
+                <span id="conn-info-region" class="conn-info-region"></span>
+            </div>
             <div id="role-badge" class="role-badge hidden">
                 <span class="role-icon">🛡️</span>
                 <span id="role-badge-text"></span>
@@ -252,7 +258,7 @@
                         </defs>
                     </svg>
                 </div>
-                <h1>Welcome to DynamoDB GUI</h1>
+                <h1>Welcome to DynamoOps</h1>
                 <p>Connect to your AWS account and select a table to start exploring your data.</p>
             </div>
 

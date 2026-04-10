@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   DynamoDB GUI — Premium Dark Theme
+   DynamoOps — Premium Dark Theme
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─── Design Tokens ──────────────────────────────────────────────── */
@@ -3718,6 +3718,11 @@ td.cell-editing {
     color: #fbbf24;
     border: 1px solid rgba(251, 191, 36, 0.3);
 }
+.env-badge-qa {
+    background: rgba(168, 85, 247, 0.15);
+    color: #a855f7;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
 .env-badge-prod {
     background: rgba(248, 113, 113, 0.15);
     color: #f87171;
@@ -3728,6 +3733,32 @@ td.cell-editing {
     0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
     50%       { box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15); }
 }
+.env-badge-local {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* ─── Connection Info Badge (header) ────────────────────────────────────── */
+.conn-info-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    font-size: 11px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+.conn-info-badge.hidden { display: none; }
+.conn-info-provider {
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.conn-info-provider.provider-aws { color: #f59e0b; }
+.conn-info-provider.provider-localstack { color: #22c55e; }
+.conn-info-region { color: var(--text-muted); }
 
 /* ─── Environment Picker (login form) ────────────────────────────────────── */
 .env-picker {
@@ -3750,8 +3781,10 @@ td.cell-editing {
 
 .env-pick-btn.env-pick-none.active  { background: var(--bg-active); color: var(--text-secondary); border-color: var(--border-strong); }
 .env-pick-btn.env-pick-dev.active   { background: rgba(96,165,250,0.15);  color: #60a5fa; border-color: rgba(96,165,250,0.4); }
+.env-pick-btn.env-pick-qa.active    { background: rgba(168,85,247,0.15);  color: #a855f7; border-color: rgba(168,85,247,0.4); }
 .env-pick-btn.env-pick-staging.active { background: rgba(251,191,36,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.4); }
 .env-pick-btn.env-pick-prod.active  { background: rgba(248,113,113,0.15); color: #f87171; border-color: rgba(248,113,113,0.4); }
+.env-pick-btn.env-pick-local.active { background: rgba(34,197,94,0.15);   color: #22c55e; border-color: rgba(34,197,94,0.4); }
 
 /* ─── Code Generator Modal ────────────────────────────────────────────────── */
 .code-gen-modal {

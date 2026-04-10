@@ -73,7 +73,7 @@ function generateCloudFormation(table) {
 
     const lines = [
         `AWSTemplateFormatVersion: '2010-09-09'`,
-        `Description: DynamoDB table schema exported from DynamoDB GUI`,
+        `Description: DynamoDB table schema exported from DynamoOps`,
         ``,
         `Resources:`,
         `  ${logicalId}:`,
@@ -228,7 +228,7 @@ function generateTerraform(table) {
     }
 
     lines.push(`  tags = {`);
-    lines.push(`    ManagedBy = "DynamoDB GUI"`);
+    lines.push(`    ManagedBy = "DynamoOps"`);
     lines.push(`  }`);
     lines.push(`}`);
 
@@ -315,7 +315,7 @@ function generatePulumi(table) {
     }
 
     lines.push(`    tags: {`);
-    lines.push(`        ManagedBy: "DynamoDB GUI",`);
+    lines.push(`        ManagedBy: "DynamoOps",`);
     lines.push(`    },`);
     lines.push(`});`);
     lines.push(``);
