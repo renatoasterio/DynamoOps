@@ -46,6 +46,8 @@ export function switchToChartView() { switchView('chart'); }
 // ─── View switching ───────────────────────────────────────────────────────────
 
 function switchView(mode) {
+    state.viewMode = mode;
+
     // Deactivate table/json/chart buttons
     ['view-table-btn', 'view-json-btn', 'view-chart-btn'].forEach(id => {
         $(`#${id}`)?.classList.toggle('active', id === `view-${mode}-btn`);

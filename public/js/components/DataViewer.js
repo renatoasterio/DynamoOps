@@ -196,6 +196,19 @@ function renderTableInfo(table) {
 }
 
 export function renderData(itemsToRender = state.items) {
+    const chartView = $('#chart-view');
+
+    if (state.viewMode === 'chart') {
+        // Chart mode — hide table/json, keep chart visible
+        dom.tableView.classList.add('hidden');
+        dom.jsonView.classList.add('hidden');
+        if (chartView) chartView.classList.remove('hidden');
+        return; // chart renders itself via renderActiveChart
+    }
+
+    // Hide chart view whenever rendering table or json
+    if (chartView) chartView.classList.add('hidden');
+
     if (state.viewMode === 'table') {
         renderTableView(itemsToRender);
         dom.tableView.classList.remove('hidden');
