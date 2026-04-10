@@ -487,57 +487,121 @@ function resetPagination() {
 
 async function goToPage(n) {
     if (n < 1) return;
-    currentPage = n;
-    // Ensure cache has entry for this page
-    const startKey = pageKeyCache[n - 1] ?? null;
-    state.lastEvaluatedKey = startKey;
-    await executeQuery(false, startKey);
+
+    // If we already have the key for page n, go directly
+    if (pageKeyCache[n - 1] !== undefined) {
+        currentPage = n;
+        const startKey = pageKeyCache[n - 1];
+        state.lastEvaluatedKey = startKey;
+        await executeQuery(false, startKey);
+        return;
+    }
+
+    // Otherwise, fetch intermediate pages sequentially to build the key chain
+    // Start from the last known page key
+    const lastKnownIdx = pageKeyCache.length - 1; // index of last cached key
+    let startPage = lastKnownIdx + 1;             // the page that key leads to
+
+    if (dom.resultInfo) dom.resultInfo.textContent = `Loading page ${n}…`;
+
+    const limit = parseInt(dom.pageSize?.value) || 50;
+    const connection = getActiveTabConnection();
+    const endpoint = state.lastQueryEndpoint;
+    const baseParams = state.lastQueryParams ? { ...state.lastQueryParams } : {};
+    const isSql = endpoint === '/execute-statement';
+    const pageKey = isSql ? 'nextToken' : 'exclusiveStartKey';
+    const resultKey = isSql ? 'nextToken' : 'lastEvaluatedKey';
+
+    let curKey = pageKeyCache[lastKnownIdx];
+
+    for (let p = startPage; p <= n; p++) {
+        const params = { ...baseParams, limit };
+        if (curKey) params[pageKey] = curKey;
+
+        try {
+            const result = await api('POST', endpoint, params, { connection });
+            const nextKey = result[resultKey] || null;
+
+            // Cache this page's next key
+            if (nextKey && pageKeyCache[p] === undefined) {
+                pageKeyCache[p] = nextKey;
+            }
+
+            // If this is the target page, update state and render
+            if (p === n) {
+                currentPage = n;
+                state.items = result.items || [];
+                state.allColumns = [...new Set(state.items.flatMap(Object.keys))];
+                state.lastEvaluatedKey = nextKey;
+                document.dispatchEvent(new CustomEvent('renderDataRequest'));
+                renderPagination(!!nextKey);
+                if (dom.resultInfo) {
+                    dom.resultInfo.textContent = `Page ${currentPage} · ${state.items.length} items`;
+                }
+                return;
+            }
+
+            // Not target yet — cache the key and continue
+            curKey = nextKey;
+            if (!nextKey) {
+                // No more pages — target page doesn't exist
+                currentPage = p;
+                state.items = result.items || [];
+                state.allColumns = [...new Set(state.items.flatMap(Object.keys))];
+                state.lastEvaluatedKey = null;
+                document.dispatchEvent(new CustomEvent('renderDataRequest'));
+                renderPagination(false);
+                if (dom.resultInfo) {
+                    dom.resultInfo.textContent = `Page ${currentPage} · ${state.items.length} items (last page)`;
+                }
+                return;
+            }
+        } catch (err) {
+            showToast(`Failed to load page ${p}: ${err.message}`, 'error');
+            return;
+        }
+    }
 }
 
 function renderPagination(hasNextPage) {
     const knownPages = pageKeyCache.length; // pages we have keys for
-    const totalKnown = hasNextPage ? knownPages + 1 : knownPages;
 
     if (!dom.paginationControls) return;
 
-    if (totalKnown <= 1 && !hasNextPage) {
+    if (knownPages <= 1 && !hasNextPage) {
         dom.paginationControls.classList.add('hidden');
         return;
     }
     dom.paginationControls.classList.remove('hidden');
 
-    // First / Prev
+    // First / Prev / Next
     if (dom.pageFirstBtn) dom.pageFirstBtn.disabled = currentPage <= 1;
     if (dom.pagePrevBtn)  dom.pagePrevBtn.disabled  = currentPage <= 1;
     if (dom.pageNextBtn)  dom.pageNextBtn.disabled  = !hasNextPage;
 
-    // Page number buttons — show up to 7, with ellipsis
-    const lastKnown = hasNextPage ? knownPages : knownPages; // last page we know
-    const pages = buildPageRange(currentPage, lastKnown, hasNextPage);
+    // Show known pages + a few extra ahead when there are more pages
+    const extraAhead = hasNextPage ? 3 : 0;
+    const totalVisible = knownPages + extraAhead;
+    const pages = buildPageRange(currentPage, totalVisible);
 
     if (!dom.pageNumbers) return;
     dom.pageNumbers.innerHTML = pages.map(p => {
         if (p === '…') return `<span class="page-ellipsis">…</span>`;
         const isCurrent = p === currentPage;
-        const isDisabled = p > knownPages && hasNextPage && p !== currentPage + 1;
         return `<button class="page-num-btn${isCurrent ? ' active' : ''}"
-                    data-page="${p}"
-                    ${isDisabled ? 'disabled' : ''}
-                    >${p}</button>`;
+                    data-page="${p}">${p}</button>`;
     }).join('');
 
-    dom.pageNumbers.querySelectorAll('.page-num-btn:not(.active):not(:disabled)').forEach(btn => {
+    dom.pageNumbers.querySelectorAll('.page-num-btn:not(.active)').forEach(btn => {
         btn.addEventListener('click', () => goToPage(parseInt(btn.dataset.page)));
     });
 }
 
-function buildPageRange(current, lastKnown, hasMore) {
-    // Always show: 1, ..., current-1, current, current+1, ..., last
-    const total = hasMore ? lastKnown + 1 : lastKnown;
+function buildPageRange(current, total) {
     if (total <= 7) {
         return Array.from({ length: total }, (_, i) => i + 1);
     }
-    const pages = new Set([1, current - 1, current, current + 1, total].filter(p => p >= 1 && p <= total));
+    const pages = new Set([1, current - 1, current, current + 1, current + 2, total].filter(p => p >= 1 && p <= total));
     const sorted = [...pages].sort((a, b) => a - b);
     const result = [];
     for (let i = 0; i < sorted.length; i++) {
@@ -827,7 +891,10 @@ export function getQueryState() {
         scanExprNames: dom.scanExprNames.value,
         scanExprValues: dom.scanExprValues.value,
         sqlStatement: dom.sqlStatement.value,
-        queryMode: state.queryMode
+        queryMode: state.queryMode,
+        // Pagination state — saved per tab
+        currentPage,
+        pageKeyCache: [...pageKeyCache],
     };
 }
 
@@ -851,6 +918,21 @@ export function setQueryState(q) {
     dom.scanExprValues.value = s.scanExprValues || '';
 
     dom.sqlStatement.value = s.sqlStatement || '';
+
+    // Restore pagination state per tab
+    currentPage  = s.currentPage || 1;
+    pageKeyCache = Array.isArray(s.pageKeyCache) ? [...s.pageKeyCache] : [null];
+
+    // Re-render pagination UI
+    const hasNextPage = !!state.lastEvaluatedKey;
+    renderPagination(hasNextPage);
+
+    // Update result info
+    if (state.items?.length && dom.resultInfo) {
+        dom.resultInfo.textContent = `Page ${currentPage} · ${state.items.length} items`;
+    } else if (dom.resultInfo) {
+        dom.resultInfo.textContent = '';
+    }
 
     // Trigger updates
     dom.queryIndex.dispatchEvent(new Event('change'));
