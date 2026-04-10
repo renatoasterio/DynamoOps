@@ -30,6 +30,15 @@ export function initChartView() {
     $('#chart-date-field')?.addEventListener('change',   () => renderTimeline());
     $('#chart-num-field')?.addEventListener('change',    () => renderDistribution());
     $('#chart-granularity')?.addEventListener('change',  () => renderTimeline());
+
+    // Re-render charts on resize so bar widths adapt to container
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (!$('#chart-view')?.classList.contains('hidden')) renderActiveChart();
+        }, 200);
+    });
 }
 
 export function switchToChartView() { switchView('chart'); }
@@ -37,6 +46,8 @@ export function switchToChartView() { switchView('chart'); }
 // ─── View switching ───────────────────────────────────────────────────────────
 
 function switchView(mode) {
+    state.viewMode = mode;
+
     // Deactivate table/json/chart buttons
     ['view-table-btn', 'view-json-btn', 'view-chart-btn'].forEach(id => {
         $(`#${id}`)?.classList.toggle('active', id === `view-${mode}-btn`);
@@ -148,9 +159,10 @@ function renderTimeline() {
         return;
     }
 
+    const cw = container.clientWidth - 40; // subtract padding
     container.innerHTML = `
       <div class="chart-title">Items por ${granularity} · campo: <strong>${field}</strong></div>
-      ${barChart(entries, { color: '#6366f1', unit: 'items' })}
+      ${barChart(entries, { color: '#6366f1', unit: 'items', containerWidth: cw })}
     `;
 }
 
@@ -194,10 +206,11 @@ function renderDistribution() {
       <span>n <strong>${values.length}</strong></span>
     </div>`;
 
+    const cw = container.clientWidth - 40;
     container.innerHTML = `
       <div class="chart-title">Distribuição de <strong>${field}</strong></div>
       ${stats}
-      ${barChart(buckets, { color: '#a78bfa', unit: 'items', rotateLabels: true })}
+      ${barChart(buckets, { color: '#a78bfa', unit: 'items', rotateLabels: true, containerWidth: cw })}
     `;
 }
 
@@ -261,11 +274,13 @@ function renderHeatmap() {
 
 // ─── SVG Bar Chart ────────────────────────────────────────────────────────────
 
-function barChart(entries, { color = '#6366f1', unit = '', rotateLabels = false } = {}) {
+function barChart(entries, { color = '#6366f1', unit = '', rotateLabels = false, containerWidth = 0 } = {}) {
     if (!entries.length) return '';
 
+    // Use actual container width (with padding offset) instead of hardcoded 760
+    const availW    = (containerWidth || 760) - 60;
     const maxVal    = Math.max(...entries.map(([, v]) => v));
-    const barW      = Math.max(18, Math.min(52, Math.floor(760 / entries.length) - 4));
+    const barW      = Math.max(18, Math.min(52, Math.floor(availW / entries.length) - 4));
     const svgW      = entries.length * (barW + 4) + 60;
     const svgH      = 220;
     const chartH    = 160;

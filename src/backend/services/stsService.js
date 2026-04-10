@@ -35,7 +35,7 @@ async function assumeRole({ roleArn, sessionName, region, profile, endpoint }) {
     const newConfig = {
         region: stsRegion,
         profile: stsProfile || 'default',
-        endpoint: endpoint || awsConfig.currentConfig.endpoint || '',
+        endpoint: endpoint || '',
     };
 
     awsConfig.setCurrentConfig(newConfig);

@@ -63,7 +63,9 @@ export function initDataViewer() {
     }
 
     document.addEventListener('renderDataRequest', () => {
-        renderData();
+        const term = dom.searchInput ? dom.searchInput.value.toLowerCase() : '';
+        if (term) filterAndRender(term);
+        else renderData();
     });
 
     document.addEventListener('resetDataViewerRequest', () => {
@@ -126,6 +128,7 @@ export function resetDataViewer() {
     sortCol   = null;
     sortDir   = null;
     colWidths = {};
+    if (dom.searchInput) dom.searchInput.value = '';
     const pc = $('#pagination-controls');
     if (pc) pc.classList.add('hidden');
     const ri = $('#result-info');
@@ -193,6 +196,19 @@ function renderTableInfo(table) {
 }
 
 export function renderData(itemsToRender = state.items) {
+    const chartView = $('#chart-view');
+
+    if (state.viewMode === 'chart') {
+        // Chart mode — hide table/json, keep chart visible
+        dom.tableView.classList.add('hidden');
+        dom.jsonView.classList.add('hidden');
+        if (chartView) chartView.classList.remove('hidden');
+        return; // chart renders itself via renderActiveChart
+    }
+
+    // Hide chart view whenever rendering table or json
+    if (chartView) chartView.classList.add('hidden');
+
     if (state.viewMode === 'table') {
         renderTableView(itemsToRender);
         dom.tableView.classList.remove('hidden');
@@ -353,7 +369,7 @@ function renderTableView(items = state.items) {
             const display = val === undefined ? '' : formatCellValue(val);
             const isKey = keyNames.includes(col);
             const titleVal = escapeHtml(JSON.stringify(val) ?? '');
-            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${col}" title="${titleVal}">${display}</td>`;
+            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${col}" title="${titleVal}"><div class="cell-value">${display}</div></td>`;
         });
         tbody += '</tr>';
     });
@@ -516,7 +532,7 @@ function initExportModal() {
         const selected = getSelectedFields();
         if (!selected.length) return showToast('Select at least one field', 'error');
 
-        const fetchAll = $('#export-fetch-all-cb')?.checked && state.lastQueryEndpoint && state.lastQueryParams;
+        const fetchAll = $('#export-fetch-all-cb')?.checked;
         let items = state.items;
 
         if (fetchAll) {
@@ -585,13 +601,10 @@ function openExportModal(format) {
         : state.items.length;
     const fetchAllRow = $('#export-fetch-all-row');
     if (fetchAllRow) {
-        if (hasMorePages) {
-            fetchAllRow.classList.remove('hidden');
-            const cb = $('#export-fetch-all-cb');
-            if (cb) cb.checked = true;
-        } else {
-            fetchAllRow.classList.add('hidden');
-        }
+        // Always show the option — allows exporting the entire table via full scan
+        fetchAllRow.classList.remove('hidden');
+        const cb = $('#export-fetch-all-cb');
+        if (cb) cb.checked = hasMorePages; // auto-check only when pagination pending
     }
     overlay.classList.remove('hidden');
 }
@@ -624,18 +637,22 @@ function getSelectedFields() {
 
 async function fetchAllItemsForExport(progressBtn) {
     const connection = getActiveTabConnection();
-    const endpoint = state.lastQueryEndpoint;
-    const baseParams = { ...state.lastQueryParams };
+
+    // If no previous query was executed, do a clean full-table scan
+    const endpoint  = state.lastQueryEndpoint || `/tables/${state.currentTable}/scan`;
+    const baseParams = state.lastQueryParams ? { ...state.lastQueryParams } : {};
+
     const isSql = endpoint === '/execute-statement';
     const pageKey = isSql ? 'nextToken' : 'exclusiveStartKey';
     const resultKey = isSql ? 'nextToken' : 'lastEvaluatedKey';
 
+    // Remove the page-size limit so each request brings back more items
+    if (!isSql && !baseParams.limit) baseParams.limit = 1000;
+
     let allItems = [];
     let continuationKey = null;
-    let page = 0;
 
     do {
-        page++;
         if (progressBtn) progressBtn.textContent = `Fetching… (${allItems.length} items)`;
         const params = { ...baseParams };
         if (continuationKey) params[pageKey] = continuationKey;
@@ -825,7 +842,7 @@ async function _applyInlineEdit(td, col, itemIdx, origVal, rawStr, origDisplay) 
         if (realIdx !== -1) state.items[realIdx] = updatedItem;
         lastSorted[itemIdx] = updatedItem;
 
-        td.innerHTML = newVal === undefined ? '' : formatCellValue(newVal);
+        td.innerHTML = `<div class="cell-value">${newVal === undefined ? '' : formatCellValue(newVal)}</div>`;
         td.title     = escapeHtml(JSON.stringify(newVal) ?? '');
         showToast(`"${col}" atualizado`, 'success');
     } catch (err) {

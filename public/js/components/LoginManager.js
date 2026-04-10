@@ -28,6 +28,24 @@ function showEnvBadge(envTag) {
     badge.className   = `env-badge env-badge-${envTag}`;
 }
 
+function updateConnInfoBadge(region, endpoint) {
+    const badge    = $('#conn-info-badge');
+    const provider = $('#conn-info-provider');
+    const regionEl = $('#conn-info-region');
+    if (!badge || !provider || !regionEl) return;
+
+    const isLocal = endpoint && (endpoint.includes('localhost') || endpoint.includes('127.0.0.1') || endpoint.includes('localstack'));
+    provider.textContent = isLocal ? '⚡ LocalStack' : '☁ AWS';
+    provider.className   = `conn-info-provider ${isLocal ? 'provider-localstack' : 'provider-aws'}`;
+    regionEl.textContent = region || '';
+    badge.classList.remove('hidden');
+}
+
+function hideConnInfoBadge() {
+    const badge = $('#conn-info-badge');
+    if (badge) badge.classList.add('hidden');
+}
+
 const dom = {
     screen: null,
     tabs: null,
@@ -436,7 +454,49 @@ function resolveRoleArn() {
     throw new Error('Informe o Account ID e Role Name, ou cole o Role ARN completo.');
 }
 
+/**
+ * Resets all client + server state from a previous connection so that a fresh
+ * connect / assume-role starts with a clean slate.  Called automatically before
+ * every new connection attempt.
+ */
+async function resetPreviousSession() {
+    if (state.connected) {
+        try { await api('POST', '/disconnect'); } catch (_) { /* ignore */ }
+    }
+    clearSessionTimer();
+
+    state.tabs = [];
+    state.activeTabId = null;
+    state.currentTable = null;
+    state.tableInfo = null;
+    state.items = [];
+    state.allColumns = [];
+    state.lastEvaluatedKey = null;
+    state.nextToken = null;
+    state.lastQueryEndpoint = null;
+    state.lastQueryParams = null;
+    state.connected = false;
+    state.tables = [];
+
+    // Reset frontend connection config to prevent stale values
+    config.region   = 'us-east-1';
+    config.profile  = 'default';
+    config.endpoint = '';
+    config.envTag   = 'none';
+
+    const tabBar = $('#tab-bar');
+    if (tabBar) { tabBar.innerHTML = ''; tabBar.classList.add('hidden'); }
+
+    // Clear sidebar
+    const tableList = $('#table-list');
+    if (tableList) tableList.innerHTML = '';
+
+    document.dispatchEvent(new CustomEvent('resetDataViewerRequest'));
+}
+
 async function connectWithParams(region, profile, endpoint, allowSave = false, envTag = 'none') {
+    await resetPreviousSession();
+
     if (allowSave && dom.saveCheckbox && dom.saveCheckbox.checked) {
         const profileName = dom.profileNameInput ? dom.profileNameInput.value.trim() : null;
         if (profileName) {
@@ -458,20 +518,21 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
         config.endpoint  = endpoint;
         config.envTag    = envTag;
         showEnvBadge(envTag);
-        
+        updateConnInfoBadge(region, endpoint);
+
         const regionSel = $('#region-select');
         const profileInp = $('#profile-input');
         const endpointInp = $('#endpoint-input');
         if (regionSel) regionSel.value = region;
         if (profileInp) profileInp.value = profile;
         if (endpointInp) endpointInp.value = endpoint;
-        
+
         const connStatus = $('#conn-status');
         if (connStatus) {
             connStatus.className = 'status connected';
             connStatus.textContent = 'Connected';
         }
-        
+
         showToast(`Connected to ${region}`, 'success');
         hideLogin();
         loadTables();
@@ -482,6 +543,7 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
 
 async function assumeRole(roleArn, sessionName, region, profile, allowSave = false, envTag = 'none') {
     if (!roleArn) throw new Error('Informe o Account ID e Role Name, ou cole o Role ARN completo.');
+    await resetPreviousSession();
 
     if (allowSave && dom.arSaveCheckbox && dom.arSaveCheckbox.checked) {
         const profileName = dom.arNameInput ? dom.arNameInput.value.trim() : null;
@@ -495,7 +557,7 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
     }
 
     try {
-        const result = await api('POST', '/assume-role', { roleArn, sessionName, region, profile });
+        const result = await api('POST', '/assume-role', { roleArn, sessionName, region, profile, endpoint: '' });
         trackRecentConnection({ roleArn, sessionName, region, awsProfile: profile, envTag });
         addRoleHistory({ roleArn, sessionName, region, awsProfile: profile, envTag });
 
@@ -504,6 +566,7 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
         config.profile  = profile;
         config.envTag   = envTag;
         showEnvBadge(envTag);
+        updateConnInfoBadge(region, '');
 
         const connStatus = $('#conn-status');
         if (connStatus) {
@@ -686,8 +749,9 @@ export function logout() {
     const roleBadge = $('#role-badge');
     if (roleBadge) roleBadge.classList.add('hidden');
 
-    // Clear env badge
+    // Clear env badge and connection info
     showEnvBadge('none');
+    hideConnInfoBadge();
     config.envTag = 'none';
 
     showLogin();

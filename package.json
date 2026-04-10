@@ -19,8 +19,8 @@
     "icons": "node scripts/generate-icons.js"
   },
   "build": {
-    "appId": "com.dynamogui.app",
-    "productName": "DynamoDB GUI",
+    "appId": "com.dynamoops.app",
+    "productName": "DynamoOps",
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
@@ -34,7 +34,7 @@
       "icon": "assets/icons/icon.icns"
     },
     "dmg": {
-      "title": "DynamoDB GUI",
+      "title": "DynamoOps",
       "contents": [
         {
           "x": 130,
@@ -70,7 +70,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DynamoDB GUI",
+      "shortcutName": "DynamoOps",
       "installerHeaderIcon": "assets/icons/icon.ico"
     },
     "files": [

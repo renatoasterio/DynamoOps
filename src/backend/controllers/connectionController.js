@@ -19,7 +19,11 @@ class ConnectionController {
                 profile: profile || 'default',
                 endpoint: endpoint || '',
             };
-            
+
+            // Clear any previous assumed-role session so the middleware
+            // doesn't keep using stale STS credentials.
+            awsConfig.setAssumedRoleInfo(null);
+
             // Still update global config for legacy reasons/initial state
             awsConfig.setCurrentConfig(newConfig);
             awsConfig.createClients(newConfig);
@@ -37,6 +41,7 @@ class ConnectionController {
 
     disconnect(req, res) {
         awsConfig.setAssumedRoleInfo(null);
+        awsConfig.setCurrentConfig({ region: 'us-east-1', profile: 'default', endpoint: '' });
         awsConfig.setConnected(false);
         res.json({ success: true });
     }

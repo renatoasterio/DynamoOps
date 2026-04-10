@@ -832,24 +832,25 @@ export function getQueryState() {
 }
 
 export function setQueryState(q) {
-    if (!q) return;
-    
-    // Switch mode first to ensure fields are visible for events
-    if (q.queryMode === 'scan') dom.modeScanBtn.click();
-    else if (q.queryMode === 'query') dom.modeQueryBtn.click();
-    else if (q.queryMode === 'sql') dom.modeSqlBtn.click();
+    // When q is falsy, clear all fields to avoid leaking filters between tabs
+    const s = q || {};
 
-    dom.queryPkValue.value = q.pkValue || '';
-    dom.querySkOp.value = q.skOp || '=';
-    dom.querySkValue.value = q.skValue || '';
-    dom.querySkValue2.value = q.skValue2 || '';
-    dom.queryIndex.value = q.index || '';
-    
-    dom.scanFilterExpr.value = q.scanFilterExpr || '';
-    dom.scanExprNames.value = q.scanExprNames || '';
-    dom.scanExprValues.value = q.scanExprValues || '';
-    
-    dom.sqlStatement.value = q.sqlStatement || '';
+    // Switch mode first to ensure fields are visible for events
+    if (s.queryMode === 'scan') dom.modeScanBtn.click();
+    else if (s.queryMode === 'query') dom.modeQueryBtn.click();
+    else if (s.queryMode === 'sql') dom.modeSqlBtn.click();
+
+    dom.queryPkValue.value = s.pkValue || '';
+    dom.querySkOp.value = s.skOp || '=';
+    dom.querySkValue.value = s.skValue || '';
+    dom.querySkValue2.value = s.skValue2 || '';
+    dom.queryIndex.value = s.index || '';
+
+    dom.scanFilterExpr.value = s.scanFilterExpr || '';
+    dom.scanExprNames.value = s.scanExprNames || '';
+    dom.scanExprValues.value = s.scanExprValues || '';
+
+    dom.sqlStatement.value = s.sqlStatement || '';
 
     // Trigger updates
     dom.queryIndex.dispatchEvent(new Event('change'));
