@@ -32,7 +32,7 @@ const OBFUSCATE_OPTS = {
     deadCodeInjection: true,
     deadCodeInjectionThreshold: 0.2,
     debugProtection: false,
-    disableConsoleOutput: false,
+    disableConsoleOutput: true,
     identifierNamesGenerator: 'hexadecimal',
     renameGlobals: false,
     rotateStringArray: true,
