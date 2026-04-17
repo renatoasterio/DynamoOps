@@ -17,7 +17,12 @@ m3nntZKcD6Fvr7A3xjB0k2uKF0GylK4gOqpAgTvAl7i2cX53qtk4Myoo4g==
 
 const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const REFRESH_TIMEOUT_MS = 5_000;
+const PERIODIC_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
 const PLAN_HIERARCHY = ['free', 'pro', 'pro_plus', 'team'];
+
+function getLicenseServerUrl() {
+    return process.env.LICENSE_SERVER_URL || 'https://dynamoops.io';
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,10 +44,11 @@ function getLicenseFilePath() {
 }
 
 function getCurrentMachineId() {
-    return crypto
-        .createHash('sha256')
-        .update(machineIdSync({ original: true }))
-        .digest('hex');
+    // Test hook: allow E2E suites to pin a specific "machine" identity.
+    // Has no effect in production — only triggered when the env var is set.
+    const override = process.env.DYNAMO_TEST_MACHINE_ID;
+    const input = override || machineIdSync({ original: true });
+    return crypto.createHash('sha256').update(input).digest('hex');
 }
 
 function readRawToken() {
@@ -145,6 +151,8 @@ function planMeetsRequirement(currentPlan, requiredPlan) {
 
 /**
  * Attempts online refresh; falls back to offline validation on network error.
+ * Returns { plan, revoked? } — when the server returns 410 MACHINE_REVOKED,
+ * deletes the local license and returns { plan: 'free', revoked: true }.
  */
 async function refreshLicense() {
     const rawJwt = readRawToken();
@@ -155,14 +163,20 @@ async function refreshLicense() {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
 
-        const baseUrl = process.env.LICENSE_SERVER_URL || 'https://dynamoops.io';
-        const res = await fetch(`${baseUrl}/api/license/refresh`, {
+        const res = await fetch(`${getLicenseServerUrl()}/api/license/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token: rawJwt, machineId }),
             signal: controller.signal,
         });
         clearTimeout(timer);
+
+        if (res.status === 410) {
+            // License was transferred to another machine. Wipe local copy.
+            console.warn('[licenseService] MACHINE_REVOKED — clearing local license');
+            await deactivateLicense();
+            return { plan: 'free', revoked: true };
+        }
 
         if (res.ok) {
             const data = await res.json();
@@ -177,6 +191,107 @@ async function refreshLicense() {
 
     // Fallback to offline validation
     return verifyToken(rawJwt);
+}
+
+/**
+ * Starts a periodic refresh loop (every 24h). Returns a stop function.
+ * onRevoked is called if the server returns MACHINE_REVOKED.
+ */
+function startPeriodicRefresh(onRevoked) {
+    const handle = setInterval(async () => {
+        try {
+            const result = await refreshLicense();
+            if (result.revoked && typeof onRevoked === 'function') {
+                onRevoked();
+            }
+        } catch (err) {
+            console.warn('[licenseService] periodic refresh error:', err.message);
+        }
+    }, PERIODIC_REFRESH_INTERVAL_MS);
+    // Don't keep the event loop alive just for this timer
+    if (typeof handle.unref === 'function') handle.unref();
+    return () => clearInterval(handle);
+}
+
+/**
+ * Requests a machine transfer for the given key. Server emails a 6-digit code
+ * to the license owner; caller must then call confirmTransfer with it.
+ */
+async function requestTransfer(key) {
+    const machineId = getCurrentMachineId();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS * 2);
+
+    const res = await fetch(`${getLicenseServerUrl()}/api/license/transfer/request`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-user-agent': `DynamoOps (${process.platform}-${process.arch})`,
+        },
+        body: JSON.stringify({ key, newMachineId: machineId }),
+        signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        return { success: false, error: data.error || 'Transfer request failed', code: data.code };
+    }
+    return { success: true, ...data };
+}
+
+/**
+ * Confirms a pending transfer with the emailed code. On success, saves the new JWT.
+ */
+async function confirmTransfer(key, code) {
+    const machineId = getCurrentMachineId();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS * 2);
+
+    const res = await fetch(`${getLicenseServerUrl()}/api/license/transfer/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, newMachineId: machineId, code }),
+        signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        return {
+            success: false,
+            error: data.error || 'Transfer confirmation failed',
+            code: data.code,
+            attemptsLeft: data.attemptsLeft,
+        };
+    }
+
+    if (data.token) {
+        await saveLicense(data.token);
+    }
+    return { success: true, plan: data.plan, email: data.email, role: data.role };
+}
+
+/**
+ * Fetches activation history (sanitized) from the server using the current JWT.
+ */
+async function getActivationHistory() {
+    const rawJwt = readRawToken();
+    if (!rawJwt) return { success: false, error: 'No license' };
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS * 2);
+
+    const res = await fetch(`${getLicenseServerUrl()}/api/license/history`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${rawJwt}` },
+        signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { success: false, error: data.error || 'History fetch failed' };
+    return { success: true, ...data };
 }
 
 /**
@@ -203,4 +318,8 @@ module.exports = {
     refreshLicense,
     saveLicense,
     deactivateLicense,
+    startPeriodicRefresh,
+    requestTransfer,
+    confirmTransfer,
+    getActivationHistory,
 };

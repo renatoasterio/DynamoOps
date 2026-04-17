@@ -4793,3 +4793,105 @@ td.cell-editing {
     background: rgba(255,255,255,0.03);
     border-radius: 8px;
 }
+
+/* ── Machine transfer flow ─────────────────────────────────────────── */
+.license-transfer-section {
+    padding: 24px 8px 8px;
+    text-align: center;
+}
+.license-transfer-code-input {
+    width: 240px;
+    margin: 16px auto 12px;
+    display: block;
+    padding: 12px 16px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 28px;
+    letter-spacing: 8px;
+    text-align: center;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text-primary, #e2e8f0);
+    border-radius: 8px;
+}
+.license-transfer-code-input:focus {
+    outline: none;
+    border-color: rgba(99,102,241,0.6);
+}
+.license-transfer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    margin-top: 8px;
+}
+.license-transfer-resend-link {
+    color: var(--accent, #818cf8);
+    font-size: 12px;
+    text-decoration: none;
+}
+.license-transfer-resend-link:hover { text-decoration: underline; }
+
+/* ── Activation history ─────────────────────────────────────────────── */
+.license-history-section {
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 12px;
+}
+.license-history-modal-box {
+    max-width: 560px;
+    width: 90%;
+}
+.activation-history-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted, #94a3b8);
+    margin-bottom: 8px;
+}
+.activation-history-current {
+    margin-bottom: 16px;
+}
+.activation-history-row {
+    display: grid;
+    grid-template-columns: 120px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+.activation-history-id {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: var(--text-muted, #94a3b8);
+}
+.activation-history-dates {
+    color: var(--text-primary, #e2e8f0);
+    font-size: 12px;
+    line-height: 1.5;
+}
+.activation-history-source-badge {
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.activation-history-source-initial {
+    background: rgba(34,197,94,0.15);
+    color: #4ade80;
+}
+.activation-history-source-transfer {
+    background: rgba(99,102,241,0.15);
+    color: #a5b4fc;
+}
+.activation-history-source-auto-revoke {
+    background: rgba(251,191,36,0.15);
+    color: #fbbf24;
+}
+.activation-history-source-deactivate-reactivate {
+    background: rgba(148,163,184,0.15);
+    color: #cbd5e1;
+}
