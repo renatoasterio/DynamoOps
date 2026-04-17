@@ -95,7 +95,7 @@ fs.mkdirSync(STAGING, { recursive: true });
 
 // 2. Copy source files to staging
 console.log('2/5  Copying source files…');
-['server.js', 'electron-main.js', 'package.json'].forEach(f => {
+['server.js', 'electron-main.js', 'preload.js', 'package.json', '.env.production'].forEach(f => {
     const src = path.join(ROOT, f);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(STAGING, f));
 });

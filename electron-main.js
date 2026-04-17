@@ -1,8 +1,32 @@
 const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
 const path = require('path');
+const fs   = require('fs');
 
 const isMac  = process.platform === 'darwin';
 const isProd = app.isPackaged;   // true when installed/built, false in dev
+
+// ─── Load environment variables from .env / .env.production ─────────
+(function loadEnvFile() {
+    const envFile = isProd ? '.env.production' : '.env';
+    const envPath = path.join(__dirname, envFile);
+    if (!fs.existsSync(envPath)) return;
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx === -1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        let val = trimmed.slice(eqIdx + 1).trim();
+        // Strip surrounding quotes
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+        }
+        // Expand \n to actual newlines (for PEM keys)
+        val = val.replace(/\\n/g, '\n');
+        if (!process.env[key]) process.env[key] = val;
+    }
+})();
 
 // ─── Start the Express server in the same process ────────────────────
 const PORT = 3457;
