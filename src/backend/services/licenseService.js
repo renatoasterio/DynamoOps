@@ -115,6 +115,8 @@ function buildStatus(payload, rawJwt, expMs, gracePeriod) {
         expiresAt: expMs || null,
         daysUntilRenewal,
         gracePeriod,
+        teamRole: payload.teamRole || null,     // 'owner' | 'member' | null
+        ownerKey: payload.ownerKey || null,     // master key for team licenses
         _rawToken: rawJwt,
     };
 }

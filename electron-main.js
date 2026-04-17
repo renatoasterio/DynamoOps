@@ -182,7 +182,71 @@ ipcMain.handle('license:activate', async (_, { key }) => {
         if (!res.ok) return { success: false, error: data.error };
 
         await licenseService.saveLicense(data.token);
-        return { success: true, plan: data.plan, email: data.email };
+        return { success: true, plan: data.plan, email: data.email, role: data.role };
+    } catch (err) {
+        return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+// ─── Team management IPC ──────────────────────────────────────────────
+const LICENSE_SERVER = 'https://dynamoops.io';
+
+ipcMain.handle('team:list-members', async () => {
+    try {
+        const status = await licenseService.getLicenseStatus();
+        if (status.plan !== 'team' || !status._rawToken) {
+            return { success: false, error: 'Team plan required' };
+        }
+        const res = await fetch(`${LICENSE_SERVER}/api/team/members`, {
+            method:  'GET',
+            headers: { Authorization: `Bearer ${status._rawToken}` },
+            signal:  AbortSignal.timeout(10000),
+        });
+        const data = await res.json();
+        if (!res.ok) return { success: false, error: data.error };
+        return { success: true, ...data };
+    } catch (err) {
+        return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+ipcMain.handle('team:invite', async (_, { email }) => {
+    try {
+        const status = await licenseService.getLicenseStatus();
+        if (status.plan !== 'team' || !status._rawToken) {
+            return { success: false, error: 'Team plan required' };
+        }
+        const res = await fetch(`${LICENSE_SERVER}/api/team/invite`, {
+            method:  'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${status._rawToken}`,
+            },
+            body:   JSON.stringify({ email }),
+            signal: AbortSignal.timeout(15000),
+        });
+        const data = await res.json();
+        if (!res.ok) return { success: false, error: data.error };
+        return { success: true, member: data.member };
+    } catch (err) {
+        return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+ipcMain.handle('team:remove-member', async (_, { email }) => {
+    try {
+        const status = await licenseService.getLicenseStatus();
+        if (status.plan !== 'team' || !status._rawToken) {
+            return { success: false, error: 'Team plan required' };
+        }
+        const res = await fetch(`${LICENSE_SERVER}/api/team/members/${encodeURIComponent(email)}`, {
+            method:  'DELETE',
+            headers: { Authorization: `Bearer ${status._rawToken}` },
+            signal:  AbortSignal.timeout(10000),
+        });
+        const data = await res.json();
+        if (!res.ok) return { success: false, error: data.error };
+        return { success: true };
     } catch (err) {
         return { success: false, error: 'Network error. Check your connection.' };
     }

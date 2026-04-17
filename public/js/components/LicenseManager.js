@@ -175,6 +175,14 @@ class LicenseManager {
                     </div>
                 </div>
                 ` : `
+                ${plan === 'team' ? `
+                <div class="license-team-section">
+                    <div class="license-team-role">
+                        <strong>Your role:</strong> ${status?.teamRole === 'owner' ? '👑 Owner' : '👤 Member'}
+                    </div>
+                    <button id="team-manage-btn" class="btn-secondary">Manage Team</button>
+                </div>
+                ` : ''}
                 <div class="license-deactivate-section">
                     <p class="license-hint">Deactivating frees this machine slot so you can activate on another machine.</p>
                     <button id="license-deactivate-btn" class="btn-danger">Deactivate License</button>
@@ -209,6 +217,12 @@ class LicenseManager {
             }
         });
 
+        // Wire up team management
+        document.getElementById('team-manage-btn')?.addEventListener('click', () => {
+            modal.remove();
+            this.showTeamModal();
+        });
+
         // Wire up deactivate
         document.getElementById('license-deactivate-btn')?.addEventListener('click', async () => {
             const errEl = document.getElementById('license-deactivate-error');
@@ -227,6 +241,149 @@ class LicenseManager {
                 this._showError(errEl, result?.error || 'Deactivation failed.');
             }
         });
+    }
+
+    async showTeamModal() {
+        const existing = document.getElementById('team-modal');
+        if (existing) existing.remove();
+
+        const isOwner = this._status?.teamRole === 'owner';
+
+        const modal = document.createElement('div');
+        modal.id = 'team-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-box team-modal-box">
+                <div class="modal-header">
+                    <h3>Team Management</h3>
+                    <button class="modal-close" id="team-modal-close">&times;</button>
+                </div>
+                <div id="team-loading" class="team-loading">Loading members…</div>
+                <div id="team-content" class="hidden">
+                    <div class="team-seats-row">
+                        <span>Seats used: <strong id="team-seats-used">—</strong> / <strong id="team-seats-limit">—</strong></span>
+                    </div>
+                    <div id="team-members-list" class="team-members-list"></div>
+                    ${isOwner ? `
+                    <div class="team-invite-section">
+                        <h4>Invite new member</h4>
+                        <div class="team-invite-row">
+                            <input type="email" id="team-invite-email" placeholder="colleague@company.com" class="team-invite-input" />
+                            <button id="team-invite-btn" class="btn-primary">Invite</button>
+                        </div>
+                        <div id="team-invite-error" class="license-error hidden"></div>
+                        <div id="team-invite-success" class="license-success hidden"></div>
+                    </div>
+                    ` : `
+                    <div class="team-member-hint">
+                        Contact your team owner to add or remove members.
+                    </div>
+                    `}
+                </div>
+            </div>
+        `;
+
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        document.body.appendChild(modal);
+        document.getElementById('team-modal-close')?.addEventListener('click', () => modal.remove());
+
+        await this._loadTeamMembers();
+
+        if (isOwner) {
+            document.getElementById('team-invite-btn')?.addEventListener('click', async () => {
+                const input  = document.getElementById('team-invite-email');
+                const errEl  = document.getElementById('team-invite-error');
+                const okEl   = document.getElementById('team-invite-success');
+                const btn    = document.getElementById('team-invite-btn');
+                const email  = input.value.trim().toLowerCase();
+                if (!email) { this._showError(errEl, 'Enter an email address.'); return; }
+
+                btn.textContent = 'Sending…';
+                btn.disabled = true;
+                const result = await window.electronAPI?.teamInvite({ email });
+                btn.textContent = 'Invite';
+                btn.disabled = false;
+
+                if (result?.success) {
+                    input.value = '';
+                    okEl.textContent = `✓ Invitation sent to ${email}`;
+                    okEl.classList.remove('hidden');
+                    setTimeout(() => okEl.classList.add('hidden'), 5000);
+                    await this._loadTeamMembers();
+                } else {
+                    this._showError(errEl, result?.error || 'Failed to send invite.');
+                }
+            });
+        }
+    }
+
+    async _loadTeamMembers() {
+        const loading = document.getElementById('team-loading');
+        const content = document.getElementById('team-content');
+        const list    = document.getElementById('team-members-list');
+        if (!loading || !content || !list) return;
+
+        const result = await window.electronAPI?.teamListMembers();
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+
+        if (!result?.success) {
+            list.innerHTML = `<div class="license-error">${result?.error || 'Failed to load members'}</div>`;
+            return;
+        }
+
+        document.getElementById('team-seats-used').textContent = result.seatsUsed;
+        document.getElementById('team-seats-limit').textContent = result.seatsLimit;
+
+        const isOwner = this._status?.teamRole === 'owner';
+
+        list.innerHTML = result.members.map((m) => {
+            const roleBadge = m.role === 'owner'
+                ? '<span class="team-role-badge team-role-owner">Owner</span>'
+                : '<span class="team-role-badge team-role-member">Member</span>';
+            const statusBadge = m.activated
+                ? '<span class="team-status-badge team-status-active">Active</span>'
+                : '<span class="team-status-badge team-status-pending">Pending</span>';
+            const removeBtn = (isOwner && m.role !== 'owner')
+                ? `<button class="team-remove-btn" data-email="${m.email}" title="Remove member">✕</button>`
+                : '';
+            const keyLine = (isOwner && m.memberKey)
+                ? `<div class="team-member-key" title="Share this key with ${m.email}">${m.memberKey}</div>`
+                : '';
+            return `
+                <div class="team-member-row">
+                    <div class="team-member-info">
+                        <div class="team-member-email">${this._escape(m.email)}</div>
+                        <div class="team-member-meta">${roleBadge} ${statusBadge}</div>
+                        ${keyLine}
+                    </div>
+                    ${removeBtn}
+                </div>
+            `;
+        }).join('');
+
+        if (isOwner) {
+            list.querySelectorAll('.team-remove-btn').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    const email = btn.dataset.email;
+                    if (!confirm(`Remove ${email} from the team?`)) return;
+                    btn.disabled = true;
+                    const res = await window.electronAPI?.teamRemoveMember({ email });
+                    if (res?.success) {
+                        await this._loadTeamMembers();
+                    } else {
+                        btn.disabled = false;
+                        alert(res?.error || 'Failed to remove member');
+                    }
+                });
+            });
+        }
+    }
+
+    _escape(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
     }
 
     _showError(el, msg) {
