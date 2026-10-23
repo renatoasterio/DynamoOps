@@ -45,7 +45,16 @@ const dom = {
 export function initQueryPanel() {
     dom.filterToggleBtn.addEventListener('click', () => {
         state.filterOpen = !state.filterOpen;
-        dom.filterPanel.classList.toggle('hidden', !state.filterOpen);
+        syncFilterPanel();
+    });
+
+    // Each tab remembers whether its filters were open. TabManager restores
+    // state.filterOpen on switch; the panel itself must follow, otherwise the
+    // previous tab's panel stays on screen and the toggle button gets out of
+    // step with it. With no tab left, the panel always closes.
+    document.addEventListener('tabChanged', (e) => {
+        if (!e.detail?.table) state.filterOpen = false;
+        syncFilterPanel();
     });
 
     dom.runBtn.addEventListener('click', () => executeQuery(false));
@@ -83,6 +92,13 @@ export function initQueryPanel() {
             e.detail.tab.queryState = getQueryState();
         }
     });
+}
+
+/** Shows/hides the filter panel and marks the toggle button according to state.filterOpen. */
+export function syncFilterPanel() {
+    dom.filterPanel.classList.toggle('hidden', !state.filterOpen);
+    dom.filterToggleBtn.classList.toggle('active', !!state.filterOpen);
+    dom.filterToggleBtn.setAttribute('aria-expanded', state.filterOpen ? 'true' : 'false');
 }
 
 export function populateQueryFields(table) {

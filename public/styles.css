@@ -5088,3 +5088,39 @@ td.cell-editing {
 .license-modal-box .license-team-section { border-bottom: none; margin-bottom: 0; padding: 8px 0; }
 .license-modal-box .license-history-section { border-top: none; margin-top: 0; padding: 4px 0 14px; }
 .license-modal-box .license-deactivate-section { padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+
+/* ─── Toolbar: one row, always ─────────────────────────
+   Before, the toolbar wrapped as soon as the Pro/Pro+ buttons were visible
+   (left 498px + right 667px > 1140px available at a 1400px window), pushing
+   "Filters" and "Execute" to a second line. Now the search box shrinks and
+   secondary buttons collapse to icons (tooltips keep their names). */
+#toolbar {
+    flex-wrap: nowrap;
+    container-type: inline-size;
+    min-width: 0;
+}
+.toolbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.toolbar-left .search-container-premium {
+    width: auto;
+    flex: 1 1 160px;
+    min-width: 110px;
+    max-width: 250px;
+}
+.toolbar-left .search-container-premium input { min-width: 0; width: 100%; }
+.toolbar-right { flex: 0 0 auto; }
+@container (max-width: 1090px) {
+    .toolbar-right .toolbar-icon-btn .btn-label { display: none; }
+    .toolbar-right .toolbar-icon-btn { padding: 5px 8px; }
+}
+@container (max-width: 900px) {
+    .toolbar-left .btn-label { display: none; }
+    #add-item-btn { padding-left: 10px; padding-right: 10px; }
+}
+#filter-toggle-btn.active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent-hover);
+}

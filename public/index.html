@@ -293,8 +293,8 @@
             <!-- Toolbar -->
             <div id="toolbar" class="hidden">
                 <div class="toolbar-left">
-                    <button id="add-item-btn" class="btn btn-primary">➕ Insert Item</button>
-                    <button id="template-btn" class="toolbar-icon-btn" title="Item Template — structured insert form">🧩 Template<span class="tpl-badge"></span></button>
+                    <button id="add-item-btn" class="btn btn-primary" title="Insert Item">➕ <span class="btn-label">Insert Item</span></button>
+                    <button id="template-btn" class="toolbar-icon-btn" title="Item Template — structured insert form">🧩 <span class="btn-label">Template</span><span class="tpl-badge"></span></button>
                     <button id="refresh-table-btn" class="toolbar-icon-btn" title="Refresh Data">🔄</button>
                     <div class="search-container-premium">
                         <span class="search-icon">🔍</span>
@@ -302,18 +302,18 @@
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <button id="export-json-btn" class="toolbar-icon-btn" title="Export JSON">⬇ JSON</button>
-                    <button id="export-csv-btn" class="toolbar-icon-btn" title="Export CSV">⬇ CSV</button>
-                    <button id="import-btn" class="toolbar-icon-btn" title="Import JSON / CSV / Excel">⬆ Import</button>
-                    <button id="cost-panel-btn" class="toolbar-icon-btn" title="Cost Analytics — session cost tracker">💰 Cost</button>
-                    <button id="code-gen-btn" class="toolbar-icon-btn" title="Generate code for current query">&lt;/&gt; Code</button>
+                    <button id="export-json-btn" class="toolbar-icon-btn" title="Export JSON">⬇ <span class="btn-label">JSON</span></button>
+                    <button id="export-csv-btn" class="toolbar-icon-btn" title="Export CSV">⬇ <span class="btn-label">CSV</span></button>
+                    <button id="import-btn" class="toolbar-icon-btn" title="Import JSON / CSV / Excel">⬆ <span class="btn-label">Import</span></button>
+                    <button id="cost-panel-btn" class="toolbar-icon-btn" title="Cost Analytics — session cost tracker">💰 <span class="btn-label">Cost</span></button>
+                    <button id="code-gen-btn" class="toolbar-icon-btn" title="Generate code for current query">&lt;/&gt; <span class="btn-label">Code</span></button>
                     <button id="history-toggle-btn" class="toolbar-icon-btn" title="Query History">🕒</button>
                     <button id="stream-toggle-btn" class="toolbar-icon-btn" title="DynamoDB Streams — real-time feed">
-                        ⚡ Stream
+                        ⚡ <span class="btn-label">Stream</span>
                         <span id="stream-status-badge" class="stream-badge hidden"></span>
                     </button>
                     <div class="divider"></div>
-                    <button id="filter-toggle-btn" class="btn-secondary">
+                    <button id="filter-toggle-btn" class="btn-secondary" title="Show / hide query filters">
                         <span>⚙</span> Filters
                     </button>
                     <button id="run-btn" class="btn-accent">
