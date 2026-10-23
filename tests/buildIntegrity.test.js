@@ -166,6 +166,10 @@ describe('Build integrity', () => {
             expect(html).toContain('header-actions');
         });
 
+        test('has a license entry point on the login screen', () => {
+            expect(html).toContain('id="login-license-bar"');
+        });
+
         test('has title DynamoOps', () => {
             expect(html).toContain('DynamoOps');
         });
@@ -211,6 +215,15 @@ describe('Build integrity', () => {
             expect(lm).toContain('code-gen-btn');
         });
 
+        test('exposes the license from header, login screen, upgrade modal and shortcut', () => {
+            expect(lm).toContain('license-cta-btn');         // header call-to-action on Free
+            expect(lm).toContain('_renderLoginBar');         // login screen bar
+            expect(lm).toContain('upgrade-have-key-btn');    // "I have a license key" in upgrade modal
+            expect(lm).toContain('onLicenseOpen');           // macOS menu
+            const km = fs.readFileSync(path.join(ROOT, 'public/js/components/KeyboardManager.js'), 'utf8');
+            expect(km).toContain('showLicenseModal');        // Cmd/Ctrl+Shift+L
+        });
+
         test('creates window.licenseManager', () => {
             expect(lm).toContain('window.licenseManager');
         });
@@ -235,6 +248,13 @@ describe('Build integrity', () => {
 
         test('exposes licenseDeactivate', () => {
             expect(preload).toContain('licenseDeactivate');
+        });
+
+        test('exposes onLicenseOpen for the macOS menu', () => {
+            expect(preload).toContain('onLicenseOpen');
+            expect(preload).toContain("'license:open'");
+            const mainJs = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
+            expect(mainJs).toContain("'license:open'");
         });
 
         test('uses contextBridge', () => {

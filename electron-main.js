@@ -110,6 +110,16 @@ function createMenu() {
             submenu: [
                 { role: 'about' },
                 { type: 'separator' },
+                {
+                    label: 'License…',
+                    accelerator: 'CmdOrCtrl+Shift+L',
+                    click: () => {
+                        if (mainWindow && !mainWindow.isDestroyed()) {
+                            mainWindow.webContents.send('license:open');
+                        }
+                    },
+                },
+                { type: 'separator' },
                 { role: 'services' },
                 { type: 'separator' },
                 { role: 'hide' },

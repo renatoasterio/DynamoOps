@@ -8,11 +8,30 @@ class LicenseManager {
 
     async init() {
         this._status = await this._fetchStatus();
-        this._renderBadge();
-        this._applyPlanToUI();
+        this._refreshUI();
         // The main process refreshes the license in the background. When the
         // server gives a definitive negative answer, drop to Free and say why.
         window.electronAPI?.onLicenseChanged?.((info) => this._handleLicenseChanged(info));
+        // macOS menu "License…" (⌘⇧L). Keyboard shortcut itself lives in KeyboardManager.
+        window.electronAPI?.onLicenseOpen?.(() => this.showLicenseModal());
+    }
+
+    /** Re-renders every license entry point (header, login screen) and plan gating. */
+    _refreshUI() {
+        this._renderBadge();
+        this._renderLoginBar();
+        this._applyPlanToUI();
+    }
+
+    // ─── Labels ──────────────────────────────────────────────────────
+    _planLabel(plan) { return { free: 'FREE', pro: 'PRO', pro_plus: 'PRO+', team: 'TEAM' }[plan] || 'FREE'; }
+    _planName(plan)  { return { free: 'Free', pro: 'Pro', pro_plus: 'Pro+', team: 'Team' }[plan] || 'Free'; }
+    _badgeClass(plan) {
+        return { free: 'badge-plan-free', pro: 'badge-plan-pro', pro_plus: 'badge-plan-proplus', team: 'badge-plan-team' }[plan]
+            || 'badge-plan-free';
+    }
+    _shortcutLabel() {
+        return /Mac/i.test(navigator.platform || '') ? '⌘⇧L' : 'Ctrl+Shift+L';
     }
 
     async _handleLicenseChanged(info) {
@@ -26,8 +45,7 @@ class LicenseManager {
         };
         alert(messages[info?.reason] || messages.revoked);
         this._status = await this._fetchStatus();
-        this._renderBadge();
-        this._applyPlanToUI();
+        this._refreshUI();
     }
 
     // ─── Plan hierarchy ───────────────────────────────────────────────
@@ -94,33 +112,71 @@ class LicenseManager {
         return { plan: 'free' };
     }
 
+    // ─── Header entry point ──────────────────────────────────────────
+    // Free plan → a real call-to-action button; paid plan → the plan badge.
     _renderBadge() {
-        // Remove existing badge
         document.getElementById('license-plan-badge')?.remove();
 
         const status = this._status;
-        if (!status) return;
+        const headerActions = document.getElementById('header-actions');
+        if (!status || !headerActions) return;
 
         const plan = status.plan || 'free';
-        const labels = { free: 'FREE', pro: 'PRO', pro_plus: 'PRO+', team: 'TEAM' };
-        const colors = {
-            free:     'badge-plan-free',
-            pro:      'badge-plan-pro',
-            pro_plus: 'badge-plan-proplus',
-            team:     'badge-plan-team',
-        };
+        const hint = `(${this._shortcutLabel()})`;
+        let el;
 
-        const badge = document.createElement('div');
-        badge.id = 'license-plan-badge';
-        badge.className = `plan-badge ${colors[plan] || 'badge-plan-free'}`;
-        badge.textContent = labels[plan] || 'FREE';
-        badge.title = 'Manage License';
-        badge.addEventListener('click', () => this.showLicenseModal());
-
-        const headerActions = document.getElementById('header-actions');
-        if (headerActions) {
-            headerActions.insertBefore(badge, headerActions.firstChild);
+        if (plan === 'free') {
+            el = document.createElement('button');
+            el.type = 'button';
+            el.className = 'license-cta-btn';
+            el.innerHTML = `
+                <span class="license-cta-key" aria-hidden="true">🔑</span>
+                <span>${status.suspended ? 'Subscription inactive' : 'Activate license'}</span>
+                <span class="plan-badge">FREE</span>`;
+            el.title = status.suspended
+                ? `Your subscription is inactive — click for details ${hint}`
+                : `Enter your license key to unlock Pro features ${hint}`;
+        } else {
+            el = document.createElement('div');
+            el.className = `plan-badge plan-badge-paid ${this._badgeClass(plan)}`;
+            el.setAttribute('role', 'button');
+            el.innerHTML = `<span>${this._planLabel(plan)}</span>${status.gracePeriod ? '<span title="Offline — grace period active">⚠️</span>' : ''}`;
+            el.title = `${this._planName(plan)} plan${status.email ? ' · ' + status.email : ''} — click to manage ${hint}`;
         }
+
+        el.id = 'license-plan-badge';
+        el.addEventListener('click', () => this.showLicenseModal());
+        headerActions.insertBefore(el, headerActions.firstChild);
+    }
+
+    // ─── Login screen entry point ────────────────────────────────────
+    // The login screen is the first thing users see, so the license must be
+    // reachable from here as well (the header is hidden until connected).
+    _renderLoginBar() {
+        const bar = document.getElementById('login-license-bar');
+        if (!bar) return;
+
+        const status = this._status;
+        if (!status) { bar.classList.add('hidden'); return; }
+
+        const plan = status.plan || 'free';
+        if (plan === 'free') {
+            bar.innerHTML = `
+                <div class="login-license-status">
+                    <span class="plan-badge badge-plan-free">FREE</span>
+                    <span>${status.suspended ? 'Subscription inactive' : 'Pro features are locked'}</span>
+                </div>
+                <button type="button" id="login-license-btn" class="login-license-link primary">🔑 Activate license</button>`;
+        } else {
+            bar.innerHTML = `
+                <div class="login-license-status">
+                    <span class="plan-badge ${this._badgeClass(plan)}">${this._planLabel(plan)}</span>
+                    <span class="login-license-email" title="${this._escape(status.email || '')}">${this._escape(status.email || '')}</span>
+                </div>
+                <button type="button" id="login-license-btn" class="login-license-link">Manage license</button>`;
+        }
+        bar.classList.remove('hidden');
+        document.getElementById('login-license-btn')?.addEventListener('click', () => this.showLicenseModal());
     }
 
     showUpgradeModal(requiredPlan) {
@@ -140,117 +196,111 @@ class LicenseManager {
                     <a href="https://dynamoops.io/#pricing" target="_blank" class="btn-primary">
                         View Plans
                     </a>
-                    <button class="btn-secondary" onclick="document.getElementById('upgrade-modal').remove()">
-                        Cancel
+                    <button type="button" class="btn-secondary" id="upgrade-have-key-btn">
+                        I have a license key
                     </button>
                 </div>
+                <button type="button" class="upgrade-modal-cancel" id="upgrade-cancel-btn">Not now</button>
             </div>
         `;
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.remove();
         });
         document.body.appendChild(modal);
+        document.getElementById('upgrade-cancel-btn')?.addEventListener('click', () => modal.remove());
+        document.getElementById('upgrade-have-key-btn')?.addEventListener('click', () => {
+            modal.remove();
+            this.showLicenseModal();
+        });
     }
 
     showLicenseModal() {
-        const existing = document.getElementById('license-modal');
-        if (existing) existing.remove();
+        document.getElementById('license-modal')?.remove();
+        document.getElementById('upgrade-modal')?.remove();
 
-        const status = this._status;
-        const plan = status?.plan || 'free';
-        const planNames = { free: 'Free', pro: 'Pro', pro_plus: 'Pro+', team: 'Team' };
+        const status = this._status || { plan: 'free' };
+        const plan = status.plan || 'free';
+        const isFree = plan === 'free';
+        const shortcut = this._shortcutLabel();
 
         const modal = document.createElement('div');
         modal.id = 'license-modal';
         modal.className = 'modal-overlay';
-        modal.innerHTML = `
-            <div class="modal-box license-modal-box">
-                <div class="modal-header">
-                    <h3>License</h3>
-                    <button class="modal-close" id="license-modal-close">&times;</button>
+
+        const warnings = `
+            ${status.gracePeriod ? `<div class="license-warning">⚠️ License expired — grace period active. Connect to the internet to renew.</div>` : ''}
+            ${status.suspended ? `<div class="license-warning">⚠️ Subscription inactive — your ${this._planName(status.suspendedPlan)} plan will be restored automatically once the subscription is reinstated.${status.email ? ` (${this._escape(status.email)})` : ''}</div>` : ''}`;
+
+        const freeBody = `
+            <div class="license-modal-head">
+                <div class="license-modal-title">
+                    <span class="license-modal-icon" aria-hidden="true">🔑</span>
+                    <h3>Activate DynamoOps</h3>
                 </div>
-                <div class="license-status-section">
-                    <div class="license-current-plan">
-                        <span class="label">Current plan</span>
-                        <span class="plan-badge ${plan === 'free' ? 'badge-plan-free' : plan === 'pro' ? 'badge-plan-pro' : plan === 'pro_plus' ? 'badge-plan-proplus' : 'badge-plan-team'}">
-                            ${planNames[plan] || 'Free'}
-                        </span>
-                    </div>
-                    ${status?.email ? `<div class="license-email">Registered to: <strong>${status.email}</strong></div>` : ''}
-                    ${status?.expiresAt ? `<div class="license-renews">Renews: <strong>${new Date(status.expiresAt).toLocaleDateString()}</strong></div>` : ''}
-                    ${status?.gracePeriod ? `<div class="license-warning">⚠️ License expired — grace period active. Connect to internet to renew.</div>` : ''}
-                    ${status?.suspended ? `<div class="license-warning">⚠️ Subscription inactive — your ${planNames[status.suspendedPlan] || 'paid'} plan will be restored automatically once the subscription is reinstated.</div>` : ''}
-                </div>
-                ${plan === 'free' ? `
-                <div class="license-activate-section">
-                    <p class="license-hint">Have a license key? Enter it below.</p>
-                    <div class="license-input-row">
-                        <input type="text" id="license-key-input" placeholder="DYNAMO-XXXX-XXXX-XXXX-XXXX" class="license-key-input" />
-                        <button id="license-activate-btn" class="btn-primary">Activate</button>
-                    </div>
-                    <div id="license-activate-error" class="license-error hidden"></div>
-                    <div class="license-get-key">
-                        Don't have a key? <a href="https://dynamoops.io/#pricing" target="_blank">Get one →</a>
-                    </div>
-                </div>
-                ` : `
-                ${plan === 'team' ? `
-                <div class="license-team-section">
-                    <div class="license-team-role">
-                        <strong>Your role:</strong> ${status?.teamRole === 'owner' ? '👑 Owner' : '👤 Member'}
-                    </div>
-                    <button id="team-manage-btn" class="btn-secondary">Manage Team</button>
-                </div>
-                ` : ''}
-                <div class="license-history-section">
-                    <button id="license-history-btn" class="btn-secondary">View activation history</button>
-                </div>
-                <div class="license-deactivate-section">
-                    <p class="license-hint">Deactivating frees this machine slot so you can activate on another machine.</p>
-                    <button id="license-deactivate-btn" class="btn-danger">Deactivate License</button>
-                    <div id="license-deactivate-error" class="license-error hidden"></div>
-                </div>
-                `}
+                <button type="button" class="modal-close" id="license-modal-close" aria-label="Close">&times;</button>
             </div>
-        `;
+            <p class="license-modal-sub">Paste the license key you received by email to unlock Pro features on this machine.</p>
+            ${warnings}
+            <div class="license-activate-section">
+                <label class="license-field-label" for="license-key-input">License key</label>
+                <div class="license-input-row">
+                    <input type="text" id="license-key-input" class="license-key-input"
+                           placeholder="DYNAMO-XXXX-XXXX-XXXX-XXXX"
+                           autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                    <button type="button" id="license-paste-btn" class="btn-secondary license-paste-btn" title="Paste from clipboard">Paste</button>
+                </div>
+                <button type="button" id="license-activate-btn" class="btn-primary license-activate-main">Activate license</button>
+                <div id="license-activate-error" class="license-error hidden" role="alert"></div>
+                <p class="license-hint license-hint-muted">
+                    Keys look like <code>DYNAMO-…</code> (or <code>TEAM-…</code> for team seats) and were sent to the email used at checkout — check your spam folder.
+                </p>
+            </div>
+            <div class="license-modal-footer">
+                <span class="license-modal-footer-plan">Current plan <span class="plan-badge badge-plan-free">FREE</span></span>
+                <a href="https://dynamoops.io/#pricing" target="_blank" class="license-modal-link">Don't have a key? See plans ↗</a>
+            </div>
+            <p class="license-shortcut-hint">Tip: press <kbd class="license-kbd">${shortcut}</kbd> to open this window anytime.</p>`;
+
+        const paidBody = `
+            <div class="license-modal-head">
+                <div class="license-modal-title">
+                    <span class="license-modal-icon" aria-hidden="true">✓</span>
+                    <h3>Your license</h3>
+                </div>
+                <button type="button" class="modal-close" id="license-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="license-status-section">
+                <div class="license-current-plan">
+                    <span class="label">Current plan</span>
+                    <span class="plan-badge ${this._badgeClass(plan)}">${this._planName(plan)}</span>
+                    ${status.teamRole ? `<span class="license-team-role">${status.teamRole === 'owner' ? '👑 Owner' : '👤 Member'}</span>` : ''}
+                </div>
+                ${status.email ? `<div class="license-email">Registered to <strong>${this._escape(status.email)}</strong></div>` : ''}
+                ${status.expiresAt ? `<div class="license-renews">Renews automatically on <strong>${new Date(status.expiresAt).toLocaleDateString()}</strong></div>` : ''}
+                ${warnings}
+            </div>
+            ${plan === 'team' ? `
+            <div class="license-team-section">
+                <div class="license-team-role">Team plan — ${status.teamRole === 'owner' ? 'you manage the seats' : 'managed by your team owner'}</div>
+                <button type="button" id="team-manage-btn" class="btn-secondary">Manage Team</button>
+            </div>` : ''}
+            <div class="license-history-section">
+                <button type="button" id="license-history-btn" class="btn-secondary">View activation history</button>
+            </div>
+            <div class="license-deactivate-section">
+                <p class="license-hint">Deactivating frees this machine slot so you can activate on another machine.</p>
+                <button type="button" id="license-deactivate-btn" class="btn-danger">Deactivate on this machine</button>
+                <div id="license-deactivate-error" class="license-error hidden"></div>
+            </div>
+            <p class="license-shortcut-hint">Tip: press <kbd class="license-kbd">${shortcut}</kbd> to open this window anytime.</p>`;
+
+        modal.innerHTML = `<div class="modal-box license-modal-box">${isFree ? freeBody : paidBody}</div>`;
 
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
         document.body.appendChild(modal);
         document.getElementById('license-modal-close')?.addEventListener('click', () => modal.remove());
 
-        // Wire up activate
-        document.getElementById('license-activate-btn')?.addEventListener('click', async () => {
-            const key    = document.getElementById('license-key-input').value.trim();
-            const errEl  = document.getElementById('license-activate-error');
-            const btn    = document.getElementById('license-activate-btn');
-            if (!key) { this._showError(errEl, 'Enter a license key.'); return; }
-            btn.textContent = 'Activating...';
-            btn.disabled = true;
-            const result = await window.electronAPI?.licenseActivate({ key });
-            if (result?.success) {
-                modal.remove();
-                this._status = await this._fetchStatus();
-                this._renderBadge();
-                this._applyPlanToUI();
-                return;
-            }
-
-            btn.textContent = 'Activate';
-            btn.disabled = false;
-
-            if (result?.code === 'MACHINE_CONFLICT_TRANSFER_REQUIRED') {
-                await this._startTransferFlow(modal, key);
-                return;
-            }
-            if (result?.code === 'TRANSFER_LIMIT_EXCEEDED') {
-                this._showError(
-                    errEl,
-                    'Annual transfer limit reached. Contact suporte@dynamoops.io for help.'
-                );
-                return;
-            }
-            this._showError(errEl, result?.error || 'Activation failed.');
-        });
+        if (isFree) this._wireActivation(modal);
 
         // Wire up team management
         document.getElementById('team-manage-btn')?.addEventListener('click', () => {
@@ -268,20 +318,121 @@ class LicenseManager {
         document.getElementById('license-deactivate-btn')?.addEventListener('click', async () => {
             const errEl = document.getElementById('license-deactivate-error');
             const btn   = document.getElementById('license-deactivate-btn');
-            btn.textContent = 'Deactivating...';
+            btn.textContent = 'Deactivating…';
             btn.disabled = true;
             const result = await window.electronAPI?.licenseDeactivate();
             if (result?.success) {
                 modal.remove();
                 this._status = await this._fetchStatus();
-                this._renderBadge();
-                this._applyPlanToUI();
+                this._refreshUI();
             } else {
-                btn.textContent = 'Deactivate License';
+                btn.textContent = 'Deactivate on this machine';
                 btn.disabled = false;
                 this._showError(errEl, result?.error || 'Deactivation failed.');
             }
         });
+    }
+
+    // ─── Activation form behaviour ───────────────────────────────────
+    _wireActivation(modal) {
+        const input = document.getElementById('license-key-input');
+        const errEl = document.getElementById('license-activate-error');
+        const btn   = document.getElementById('license-activate-btn');
+        if (!input || !btn) return;
+
+        const normalize = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+
+        input.addEventListener('input', () => {
+            const caret = input.selectionStart;
+            input.value = normalize(input.value);
+            try { input.setSelectionRange(caret, caret); } catch { /* ignore */ }
+            input.classList.remove('invalid');
+            errEl?.classList.add('hidden');
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
+        });
+        document.getElementById('license-paste-btn')?.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) input.value = normalize(text);
+            } catch { /* clipboard not available — user can paste manually */ }
+            input.focus();
+        });
+        setTimeout(() => input.focus(), 60);
+
+        btn.addEventListener('click', async () => {
+            const key = normalize(input.value);
+            if (!key) {
+                input.classList.add('invalid');
+                input.focus();
+                this._showError(errEl, 'Enter your license key.', 0);
+                return;
+            }
+
+            btn.textContent = 'Activating…';
+            btn.disabled = true;
+            input.disabled = true;
+
+            const result = window.electronAPI?.licenseActivate
+                ? await window.electronAPI.licenseActivate({ key })
+                : { success: false, error: 'Activation is only available inside the DynamoOps desktop app.' };
+
+            if (result?.success) {
+                this._status = await this._fetchStatus();
+                this._refreshUI();
+                this._showActivationSuccess(modal, result);
+                return;
+            }
+
+            btn.textContent = 'Activate license';
+            btn.disabled = false;
+            input.disabled = false;
+
+            if (result?.code === 'MACHINE_CONFLICT_TRANSFER_REQUIRED') {
+                await this._startTransferFlow(modal, key);
+                return;
+            }
+            if (result?.code === 'TRANSFER_LIMIT_EXCEEDED') {
+                this._showError(errEl, 'Annual transfer limit reached. Contact suporte@dynamoops.io for help.', 0);
+                return;
+            }
+            input.classList.add('invalid');
+            input.focus();
+            this._showError(errEl, this._friendlyActivationError(result), 0);
+        });
+    }
+
+    _friendlyActivationError(result) {
+        const raw = String(result?.error || '');
+        if (result?.code === 'NETWORK_ERROR' || /network/i.test(raw)) {
+            return 'Could not reach dynamoops.io. Check your internet connection and try again.';
+        }
+        if (/not found/i.test(raw)) {
+            return 'We couldn\'t find this key. Check for typos — the key is in your purchase email.';
+        }
+        if (/not active/i.test(raw)) {
+            return 'This license is not active (the subscription was cancelled or payment failed). Contact suporte@dynamoops.io if this is unexpected.';
+        }
+        return raw || 'Activation failed. Please try again.';
+    }
+
+    _showActivationSuccess(modal, result) {
+        const box = modal.querySelector('.modal-box');
+        if (!box) return;
+        const plan = result?.plan || this._status?.plan || 'pro';
+        box.innerHTML = `
+            <div class="license-success-state">
+                <div class="license-success-icon" aria-hidden="true">✓</div>
+                <h3>${this._planName(plan)} plan activated</h3>
+                <p class="license-modal-sub">
+                    ${result?.email ? `Registered to <strong>${this._escape(result.email)}</strong>. ` : ''}
+                    Pro features are now unlocked on this machine.
+                </p>
+                <button type="button" id="license-success-done" class="btn-primary license-activate-main">Start using DynamoOps</button>
+            </div>`;
+        document.getElementById('license-success-done')?.addEventListener('click', () => modal.remove());
+        setTimeout(() => { if (document.body.contains(modal)) modal.remove(); }, 5000);
     }
 
     async showTeamModal() {
@@ -479,8 +630,7 @@ class LicenseManager {
             if (res?.success) {
                 modal.remove();
                 this._status = await this._fetchStatus();
-                this._renderBadge();
-                this._applyPlanToUI();
+                this._refreshUI();
                 return;
             }
 
@@ -586,11 +736,12 @@ class LicenseManager {
         }[c]));
     }
 
-    _showError(el, msg) {
+    /** Shows an inline error. hideAfter = 0 keeps it until the next input. */
+    _showError(el, msg, hideAfter = 5000) {
         if (!el) return;
         el.textContent = msg;
         el.classList.remove('hidden');
-        setTimeout(() => el.classList.add('hidden'), 5000);
+        if (hideAfter > 0) setTimeout(() => el.classList.add('hidden'), hideAfter);
     }
 }
 

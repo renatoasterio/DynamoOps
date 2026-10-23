@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Fired by the background refresh when the plan is lost:
     // info = { reason: 'revoked' | 'not_found' | 'suspended', plan }
     onLicenseChanged:       (cb) => ipcRenderer.on('license:changed', (_event, info) => cb(info)),
+    // macOS menu "License…" (⌘⇧L)
+    onLicenseOpen:          (cb) => ipcRenderer.on('license:open', () => cb()),
 
     // Team management
     teamListMembers:        () => ipcRenderer.invoke('team:list-members'),
