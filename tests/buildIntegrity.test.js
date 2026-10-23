@@ -101,13 +101,21 @@ describe('Build integrity', () => {
             expect(mainJs).toContain("license:deactivate");
         });
 
-        test('activates against the configured LICENSE_SERVER', () => {
-            // URL now comes from the LICENSE_SERVER_URL env var (set by
-            // .env.production to https://dynamoops.io). The template literal
-            // uses a LICENSE_SERVER constant declared at the top of the file.
-            expect(mainJs).toContain("process.env.LICENSE_SERVER_URL");
-            expect(mainJs).toContain("'https://dynamoops.io'"); // fallback default
-            expect(mainJs).toContain("${LICENSE_SERVER}/api/license/activate");
+        test('delegates activation/deactivation to licenseService (single server URL source)', () => {
+            const svc = fs.readFileSync(path.join(ROOT, 'src/backend/services/licenseService.js'), 'utf8');
+            expect(svc).toContain('process.env.LICENSE_SERVER_URL');
+            expect(svc).toContain("'https://dynamoops.io'"); // fallback default
+            expect(svc).toContain('/api/license/activate');
+            expect(mainJs).toContain('licenseService.activateLicense(');
+            expect(mainJs).toContain('licenseService.deactivateWithServer(');
+            expect(mainJs).toContain('licenseService.getLicenseServerUrl()');
+            expect(mainJs).not.toContain('https://dynamoops.io/api'); // no duplicated URLs
+            expect(mainJs).not.toContain('machineIdSync');            // machine id computed in one place
+        });
+
+        test('starts the periodic license refresh and forwards changes to the renderer', () => {
+            expect(mainJs).toContain('licenseService.startPeriodicRefresh(');
+            expect(mainJs).toContain("'license:changed'");
         });
     });
 
@@ -127,6 +135,15 @@ describe('Build integrity', () => {
 
         test('does NOT contain test/dev URLs', () => {
             expect(envContent).not.toContain('localhost:3000');
+        });
+
+        test('public key equals the hardcoded fallback in licenseService.js', () => {
+            const envKey = (envContent.match(/^DYNAMO_LICENSE_PUBLIC_KEY=(.*)$/m) || [])[1] || '';
+            const normalize = (v) => v.replace(/^"|"$/g, '').replace(/\\n/g, '\n').replace(/\s+/g, '');
+            const svc = fs.readFileSync(path.join(ROOT, 'src/backend/services/licenseService.js'), 'utf8');
+            const fallback = (svc.match(/-----BEGIN PUBLIC KEY-----[\s\S]*?-----END PUBLIC KEY-----/) || [])[0] || '';
+            expect(fallback).not.toBe('');
+            expect(normalize(envKey)).toBe(normalize(fallback));
         });
     });
 

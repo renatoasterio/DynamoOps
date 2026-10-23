@@ -75,17 +75,9 @@ async function getServerState() {
 }
 
 async function activate(key) {
-    // Simulate what the activate IPC handler does in electron-main.js
-    const machineId = hashOf(process.env.DYNAMO_TEST_MACHINE_ID);
-    const res = await fetch(`${process.env.LICENSE_SERVER_URL}/api/license/activate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, machineId }),
-    });
-    const data = await res.json();
-    if (!res.ok) return { success: false, error: data.error, code: data.code };
-    await licenseService.saveLicense(data.token);
-    return { success: true, plan: data.plan, email: data.email, role: data.role };
+    // Real production code path: the 'license:activate' IPC handler in
+    // electron-main.js delegates straight to licenseService.activateLicense.
+    return licenseService.activateLicense(key);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -439,5 +431,167 @@ describe('Scenario 7 — daily refresh updates lastRefreshAt', () => {
         const before = licenses[0].activatedAt;
         const after = licenses[0].lastRefreshAt;
         expect(new Date(after).getTime()).toBeGreaterThan(new Date(before).getTime());
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scenario 8 — activation errors keep the server's machine-readable code
+// (the UI relies on it to start the transfer flow)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Scenario 8 — activation surfaces the server error code', () => {
+    test('409 on a second machine returns code MACHINE_CONFLICT_TRANSFER_REQUIRED', async () => {
+        await seedLicense({ key: 'DYNAMO-PRO-CODE', plan: 'pro', email: 'code@example.com' });
+        setMachine('machine-code-A');
+        expect((await activate('DYNAMO-PRO-CODE')).success).toBe(true);
+
+        // "Another machine": same user dir, different machine identity, no local token
+        fs.unlinkSync(LICENSE_FILE);
+        setMachine('machine-code-B');
+        const result = await activate('DYNAMO-PRO-CODE');
+        expect(result.success).toBe(false);
+        expect(result.code).toBe('MACHINE_CONFLICT_TRANSFER_REQUIRED');
+        expect(result.error).toMatch(/another machine/);
+        expect(fs.existsSync(LICENSE_FILE)).toBe(false); // a failed attempt never stores a token
+    });
+
+    test('unknown key returns success:false with the server message and no token', async () => {
+        setMachine('machine-code-C');
+        const result = await activate('DYNAMO-DOES-NOT-EXIST');
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/not found/i);
+        expect(fs.existsSync(LICENSE_FILE)).toBe(false);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scenario 9 — subscription suspended (Stripe webhook) and later reinstated
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Scenario 9 — subscription suspended on the server', () => {
+    const doc = { key: 'DYNAMO-PRO-SUSP', plan: 'pro', email: 'susp@example.com' };
+
+    test('refresh → 402: plan drops to free, token kept, plan restored when reinstated', async () => {
+        await seedLicense(doc);
+        setMachine('machine-susp');
+        expect((await activate('DYNAMO-PRO-SUSP')).success).toBe(true);
+
+        // Stripe webhook suspends the license (status → 'suspended')
+        await seedLicense({ ...doc, status: 'suspended', machineId: hashOf('machine-susp') });
+
+        const first = await licenseService.refreshLicense();
+        expect(first.plan).toBe('free');
+        expect(first.suspended).toBe(true);
+        expect(first.justSuspended).toBe(true);
+        expect(first.suspendedPlan).toBe('pro');
+        expect(fs.existsSync(LICENSE_FILE)).toBe(true);
+
+        // Survives a restart: offline status also reports free (middleware → 402)
+        const status = await licenseService.getLicenseStatus();
+        expect(status.plan).toBe('free');
+        expect(status.suspended).toBe(true);
+
+        // A second refresh while still suspended is not a new transition (no second alert)
+        const second = await licenseService.refreshLicense();
+        expect(second.plan).toBe('free');
+        expect(second.justSuspended).toBe(false);
+
+        // Subscription reinstated → next refresh restores the plan without re-activation
+        await seedLicense({ ...doc, status: 'active', machineId: hashOf('machine-susp') });
+        const restored = await licenseService.refreshLicense();
+        expect(restored.plan).toBe('pro');
+        expect(restored.suspended).toBeUndefined();
+        expect((await licenseService.getLicenseStatus()).plan).toBe('pro');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scenario 10 — team member removed by the owner loses access on next refresh
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Scenario 10 — team member removed by the owner', () => {
+    test('refresh → 404: local license is wiped and reported as revoked/not_found', async () => {
+        const owner  = { email: 'owner@example.com', role: 'owner',  memberKey: 'TEAM-OWNER-RM', invitedAt: new Date() };
+        const member = { email: 'm@example.com',     role: 'member', memberKey: 'TEAM-GONE-KEY',  invitedAt: new Date() };
+        const team = { key: 'DYNAMO-TEAM-RM', plan: 'team', email: owner.email, seatsLimit: 5 };
+
+        await seedLicense({ ...team, members: [owner, member] });
+        setMachine('machine-member-rm');
+        expect((await activate('TEAM-GONE-KEY')).success).toBe(true);
+        expect((await licenseService.getLicenseStatus()).plan).toBe('team');
+
+        // Owner removes the member
+        await seedLicense({ ...team, members: [owner] });
+
+        const result = await licenseService.refreshLicense();
+        expect(result.plan).toBe('free');
+        expect(result.revoked).toBe(true);
+        expect(result.reason).toBe('not_found');
+        expect(fs.existsSync(LICENSE_FILE)).toBe(false);
+        expect((await licenseService.getLicenseStatus()).plan).toBe('free');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scenario 11 — a misconfigured host must never destroy a valid license
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Scenario 11 — non-JSON 404 from a wrong base URL', () => {
+    test('falls back to offline validation and keeps the token', async () => {
+        await seedLicense({ key: 'DYNAMO-PRO-HOST', plan: 'pro', email: 'host@example.com' });
+        setMachine('machine-host');
+        expect((await activate('DYNAMO-PRO-HOST')).success).toBe(true);
+
+        const goodUrl = process.env.LICENSE_SERVER_URL;
+        process.env.LICENSE_SERVER_URL = `${goodUrl}/wrong-base`; // express answers with an HTML 404
+        try {
+            const result = await licenseService.refreshLicense();
+            expect(result.plan).toBe('pro');
+            expect(result.revoked).toBeUndefined();
+            expect(result.suspended).toBeUndefined();
+            expect(fs.existsSync(LICENSE_FILE)).toBe(true);
+        } finally {
+            process.env.LICENSE_SERVER_URL = goodUrl;
+        }
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scenario 12 — deactivation frees the slot on the server
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Scenario 12 — deactivate notifies the server and frees the slot', () => {
+    test('deactivateWithServer clears the binding server-side and locally', async () => {
+        await seedLicense({ key: 'DYNAMO-PRO-DEACT', plan: 'pro', email: 'deact@example.com' });
+        setMachine('machine-deact');
+        expect((await activate('DYNAMO-PRO-DEACT')).success).toBe(true);
+
+        const result = await licenseService.deactivateWithServer();
+        expect(result.success).toBe(true);
+        expect(fs.existsSync(LICENSE_FILE)).toBe(false);
+
+        const state = await getServerState();
+        const lic = state.licenses.find((l) => l.key === 'DYNAMO-PRO-DEACT');
+        expect(lic.machineId).toBeUndefined();
+
+        // The key can now be activated on another machine without a transfer code
+        setMachine('machine-deact-2');
+        expect((await activate('DYNAMO-PRO-DEACT')).success).toBe(true);
+    });
+
+    test('deactivateWithServer still clears the local license when the server is unreachable', async () => {
+        await seedLicense({ key: 'DYNAMO-PRO-OFFL', plan: 'pro', email: 'offl@example.com' });
+        setMachine('machine-offl');
+        expect((await activate('DYNAMO-PRO-OFFL')).success).toBe(true);
+
+        const goodUrl = process.env.LICENSE_SERVER_URL;
+        process.env.LICENSE_SERVER_URL = 'http://127.0.0.1:1'; // nothing listens here
+        try {
+            const result = await licenseService.deactivateWithServer();
+            expect(result.success).toBe(true);
+            expect(fs.existsSync(LICENSE_FILE)).toBe(false);
+        } finally {
+            process.env.LICENSE_SERVER_URL = goodUrl;
+        }
     });
 });

@@ -162,36 +162,24 @@ function createMenu() {
 }
 
 // ─── License IPC ──────────────────────────────────────────────────────
-const licenseService  = require('./src/backend/services/licenseService');
-const { machineIdSync } = require('node-machine-id');
+const licenseService = require('./src/backend/services/licenseService');
 
-const LICENSE_SERVER = process.env.LICENSE_SERVER_URL || 'https://dynamoops.io';
+// Single source of truth for the server URL (LICENSE_SERVER_URL from .env / .env.production)
+const LICENSE_SERVER = licenseService.getLicenseServerUrl();
 
 ipcMain.handle('license:status', async () => {
     return await licenseService.getLicenseStatus();
 });
 
+// Activation lives in licenseService so the exact production code path is
+// covered by the HTTP e2e suite. Error responses keep the server's `code`
+// (MACHINE_CONFLICT_TRANSFER_REQUIRED, TRANSFER_LIMIT_EXCEEDED, …) so the UI
+// can start the machine-transfer flow.
 ipcMain.handle('license:activate', async (_, { key }) => {
     try {
-        const machineId = require('crypto')
-            .createHash('sha256')
-            .update(machineIdSync({ original: true }))
-            .digest('hex');
-
-        const res = await fetch(`${LICENSE_SERVER}/api/license/activate`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ key, machineId }),
-            signal:  AbortSignal.timeout(10000),
-        });
-
-        const data = await res.json();
-        if (!res.ok) return { success: false, error: data.error };
-
-        await licenseService.saveLicense(data.token);
-        return { success: true, plan: data.plan, email: data.email, role: data.role };
+        return await licenseService.activateLicense(key);
     } catch (err) {
-        return { success: false, error: 'Network error. Check your connection.' };
+        return { success: false, error: err.message || 'Activation failed' };
     }
 });
 
@@ -285,22 +273,8 @@ ipcMain.handle('license:history', async () => {
 
 ipcMain.handle('license:deactivate', async () => {
     try {
-        const status = await licenseService.getLicenseStatus();
-        if (status.plan !== 'free') {
-            const machineId = require('crypto')
-                .createHash('sha256')
-                .update(machineIdSync({ original: true }))
-                .digest('hex');
-            // Best-effort deactivation on server
-            await fetch(`${LICENSE_SERVER}/api/license/deactivate`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ token: status._rawToken, machineId }),
-                signal:  AbortSignal.timeout(5000),
-            }).catch(() => {});
-        }
-        await licenseService.deactivateLicense();
-        return { success: true };
+        // Frees the machine slot on the server (best effort) and removes license.json
+        return await licenseService.deactivateWithServer();
     } catch (err) {
         return { success: false, error: err.message };
     }
@@ -311,12 +285,16 @@ app.whenReady().then(() => {
     createMenu();
     createWindow();
 
-    // Kick off periodic license refresh. If the server reports that this
-    // machine's slot was taken over by another, we notify the renderer so
-    // the UI can alert the user and drop them to the free plan.
-    licenseService.startPeriodicRefresh(() => {
+    // Refresh the license shortly after startup and then every 24h. When the
+    // server gives a definitive negative answer (slot taken over by another
+    // machine, team membership removed, subscription suspended) tell the
+    // renderer so the UI drops to the free plan and explains why.
+    licenseService.startPeriodicRefresh((result) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('license:revoked');
+            mainWindow.webContents.send('license:changed', {
+                reason: result.reason || (result.revoked ? 'revoked' : 'suspended'),
+                plan:   result.plan,
+            });
         }
     });
 

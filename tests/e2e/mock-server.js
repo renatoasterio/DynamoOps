@@ -247,7 +247,15 @@ async function createMockServer() {
         }
 
         const resolved = findLicenseByKey(payload.key);
-        if (!resolved) return res.status(402).json({ error: 'not active' });
+        if (!resolved) {
+            // Mirrors front/: a team token whose member was removed → 404,
+            // an unknown key → 402.
+            if (payload.ownerKey) return res.status(404).json({ error: 'Team membership not found' });
+            return res.status(402).json({ error: 'License is not active' });
+        }
+        if (resolved.license.status !== 'active') {
+            return res.status(402).json({ error: 'License is not active' });
+        }
 
         const now = new Date();
 

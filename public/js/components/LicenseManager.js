@@ -10,14 +10,21 @@ class LicenseManager {
         this._status = await this._fetchStatus();
         this._renderBadge();
         this._applyPlanToUI();
-        // If the server tells us this machine's slot was taken over by another,
-        // drop to free plan and notify the user.
-        window.electronAPI?.onLicenseRevoked?.(() => this._handleRevoked());
+        // The main process refreshes the license in the background. When the
+        // server gives a definitive negative answer, drop to Free and say why.
+        window.electronAPI?.onLicenseChanged?.((info) => this._handleLicenseChanged(info));
     }
 
-    async _handleRevoked() {
-        alert('Your DynamoOps license was transferred to another machine. ' +
-              'This installation has been switched to the Free plan.');
+    async _handleLicenseChanged(info) {
+        const messages = {
+            revoked:   'Your DynamoOps license was transferred to another machine. ' +
+                       'This installation has been switched to the Free plan.',
+            not_found: 'Your DynamoOps license is no longer valid (it may have been removed ' +
+                       'from its team). This installation has been switched to the Free plan.',
+            suspended: 'Your DynamoOps subscription is no longer active. This installation ' +
+                       'has been switched to the Free plan until the subscription is reinstated.',
+        };
+        alert(messages[info?.reason] || messages.revoked);
         this._status = await this._fetchStatus();
         this._renderBadge();
         this._applyPlanToUI();
@@ -172,6 +179,7 @@ class LicenseManager {
                     ${status?.email ? `<div class="license-email">Registered to: <strong>${status.email}</strong></div>` : ''}
                     ${status?.expiresAt ? `<div class="license-renews">Renews: <strong>${new Date(status.expiresAt).toLocaleDateString()}</strong></div>` : ''}
                     ${status?.gracePeriod ? `<div class="license-warning">⚠️ License expired — grace period active. Connect to internet to renew.</div>` : ''}
+                    ${status?.suspended ? `<div class="license-warning">⚠️ Subscription inactive — your ${planNames[status.suspendedPlan] || 'paid'} plan will be restored automatically once the subscription is reinstated.</div>` : ''}
                 </div>
                 ${plan === 'free' ? `
                 <div class="license-activate-section">

@@ -11,7 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     licenseTransferRequest: (args) => ipcRenderer.invoke('license:transfer-request', args),
     licenseTransferConfirm: (args) => ipcRenderer.invoke('license:transfer-confirm', args),
     licenseHistory:         () => ipcRenderer.invoke('license:history'),
-    onLicenseRevoked:       (cb) => ipcRenderer.on('license:revoked', () => cb()),
+
+    // Fired by the background refresh when the plan is lost:
+    // info = { reason: 'revoked' | 'not_found' | 'suspended', plan }
+    onLicenseChanged:       (cb) => ipcRenderer.on('license:changed', (_event, info) => cb(info)),
 
     // Team management
     teamListMembers:        () => ipcRenderer.invoke('team:list-members'),
