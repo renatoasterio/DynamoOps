@@ -278,6 +278,10 @@ describe('Build integrity', () => {
         test('imports requirePlan', () => {
             expect(routes).toContain('requirePlan');
         });
+
+        test('PartiQL writes require pro (SELECT stays free)', () => {
+            expect(routes).toMatch(/execute-statement.*requirePlanWhen.*isWriteStatement.*'pro'/);
+        });
     });
 
     // ── stsService does not inherit stale endpoint ───────────────────────────

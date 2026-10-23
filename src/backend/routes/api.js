@@ -6,7 +6,8 @@ const connectionController = require('../controllers/connectionController');
 const tableController      = require('../controllers/tableController');
 const itemController       = require('../controllers/itemController');
 const importController     = require('../controllers/importController');
-const { requirePlan }      = require('../middleware/license');
+const { requirePlan, requirePlanWhen } = require('../middleware/license');
+const { isWriteStatement } = require('../utils/partiql');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
@@ -31,7 +32,8 @@ router.get('/tables/:name/stream/records', requirePlan('pro'), (req, res) => tab
 // ─── Queries & Scans ──────────────────────────────────
 router.post('/tables/:name/scan', (req, res) => tableController.scan(req, res));
 router.post('/tables/:name/query', (req, res) => tableController.query(req, res));
-router.post('/execute-statement', (req, res) => tableController.executeStatement(req, res));
+// PartiQL: SELECT is free; INSERT / UPDATE / DELETE modify data and need Pro (same as item CRUD)
+router.post('/execute-statement', requirePlanWhen((req) => isWriteStatement(req.body && req.body.statement), 'pro'), (req, res) => tableController.executeStatement(req, res));
 
 // ─── Items ────────────────────────────────────────────
 router.put('/tables/:name/items', requirePlan('pro'), (req, res) => itemController.put(req, res));

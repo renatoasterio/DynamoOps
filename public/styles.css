@@ -5124,3 +5124,179 @@ td.cell-editing {
     border-color: var(--accent);
     color: var(--accent-hover);
 }
+
+/* ─── SQL (PartiQL) editor ───────────────────────────── */
+:root {
+    --sql-kw: #c4b5fd;
+    --sql-fn: #7dd3fc;
+    --sql-string: #86efac;
+    --sql-number: #fcd34d;
+    --sql-ident: #e8eaf0;
+    --sql-comment: #5c6175;
+    --sql-op: #f9a8d4;
+}
+[data-theme="light"] {
+    --sql-kw: #6d28d9;
+    --sql-fn: #0369a1;
+    --sql-string: #047857;
+    --sql-number: #b45309;
+    --sql-ident: #1a1c24;
+    --sql-comment: #8b8fa4;
+    --sql-op: #be185d;
+}
+
+.sql-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+.sql-toolbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sql-toolbar-left label { margin: 0; }
+.sql-toolbar-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.sql-kind-pill {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.sql-kind-read  { background: var(--success-subtle); color: var(--success); border: 1px solid rgba(52, 211, 153, 0.3); }
+.sql-kind-write { background: rgba(245, 158, 11, 0.14); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.4); }
+.sql-tool-btn {
+    background: none;
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    padding: 4px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11.5px;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+.sql-tool-btn:hover, .sql-tool-btn.active { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-strong); }
+.sql-tool-link { font-size: 11.5px; color: var(--text-muted); text-decoration: none; padding: 4px 4px; }
+.sql-tool-link:hover { color: var(--accent-hover); }
+.sql-templates-wrap { position: relative; }
+.sql-templates-menu {
+    right: 0;
+    left: auto;
+    width: 360px;
+    max-height: 340px;
+}
+.sql-tpl-group {
+    padding: 6px 12px 2px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.sql-tpl-item { padding: 6px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.sql-tpl-item:hover { background: var(--bg-hover); }
+.sql-tpl-label { font-size: 12.5px; color: var(--text-primary); }
+.sql-tpl-preview {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sql-tpl-write .sql-tpl-label::after { content: ' · writes data'; color: var(--warning); font-size: 10px; }
+
+/* Overlay highlighting: the <pre> renders the colored tokens, the textarea on
+   top is transparent (only the caret and selection are visible). Both must
+   share the exact same box metrics. */
+.sql-editor-container {
+    position: relative;
+    width: 100%;
+    background: var(--bg-base);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.sql-editor-container:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle); }
+.sql-highlight,
+#sql-statement {
+    margin: 0;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: normal;
+    tab-size: 2;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+    width: 100%;
+    border: 0;
+    border-radius: var(--radius-sm);
+}
+.sql-highlight {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    color: var(--sql-ident);
+    background: transparent;
+}
+.sql-highlight code { font: inherit; white-space: inherit; }
+#sql-statement {
+    position: relative;
+    display: block;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--text-primary);
+    min-height: 96px;
+    max-height: 320px;
+    overflow-y: auto;
+    resize: none;
+    outline: none;
+    box-shadow: none;
+}
+#sql-statement::placeholder { color: var(--text-muted); }
+#sql-statement::selection { background: rgba(99, 102, 241, 0.35); color: transparent; }
+#sql-statement:focus { border: 0; box-shadow: none; outline: none; }
+.sql-tk-kw      { color: var(--sql-kw); font-weight: 600; }
+.sql-tk-fn      { color: var(--sql-fn); }
+.sql-tk-string  { color: var(--sql-string); }
+.sql-tk-number  { color: var(--sql-number); }
+.sql-tk-ident   { color: var(--sql-ident); }
+.sql-tk-comment { color: var(--sql-comment); font-style: italic; }
+.sql-tk-op      { color: var(--sql-op); }
+
+.sql-error {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--danger-subtle);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger-hover);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+.sql-hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.sql-hint kbd {
+    font-family: inherit;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+}
+.sql-hint code { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--text-secondary); }

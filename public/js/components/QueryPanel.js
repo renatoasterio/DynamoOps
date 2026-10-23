@@ -4,7 +4,8 @@ import { api } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
 import { addToHistory } from './HistoryManager.js';
 import { getActiveTabConnection } from './TabManager.js';
-import { trackRead, fmtCost, fmtCU } from './CostTracker.js';
+import { trackRead, trackWrite, fmtCost, fmtCU } from './CostTracker.js';
+import { initSqlEditor, refreshSqlHighlight, sqlStatementKind, showSqlError, clearSqlError } from './SqlEditor.js';
 
 const dom = {
     modeScanBtn: $('#mode-scan-btn'),
@@ -66,6 +67,7 @@ export function initQueryPanel() {
 
     initModeToggles();
     initSqlAutocomplete();
+    initSqlEditor({ textarea: dom.sqlStatement });
 
     dom.querySkOp.addEventListener('change', () => {
         dom.querySkValue2Field.style.display = dom.querySkOp.value === 'between' ? 'flex' : 'none';
@@ -179,6 +181,7 @@ function initModeToggles() {
         if (!dom.sqlStatement.value.trim() && state.currentTable) {
             dom.sqlStatement.value = `SELECT * FROM "${state.currentTable}"`;
         }
+        refreshSqlHighlight();
     });
 }
 
@@ -410,8 +413,7 @@ function initSqlAutocomplete() {
         const newCursor = wordStart + text.length + trailingSpace.length;
         ta.setSelectionRange(newCursor, newCursor);
 
-        ta.style.height = 'auto';
-        ta.style.height = ta.scrollHeight + 'px';
+        refreshSqlHighlight();
 
         hideDropdown();
         ta.focus();
@@ -422,9 +424,6 @@ function initSqlAutocomplete() {
         if (state.queryMode !== 'sql') return;
 
         const ta = dom.sqlStatement;
-        ta.style.height = 'auto';
-        ta.style.height = ta.scrollHeight + 'px';
-
         const val    = ta.value;
         const cursor = ta.selectionStart;
         const before = val.substring(0, cursor);
@@ -489,6 +488,18 @@ function initSqlAutocomplete() {
             hideDropdown();
         }
     });
+}
+
+// ─── SQL mode state ───────────────────────────────────────────────────────────
+// Last SELECT that ran in the active tab (saved per tab). After a successful
+// INSERT / UPDATE / DELETE it is re-run so the grid shows the effect.
+let lastSqlReadStatement = '';
+// When set, executeQuery runs this statement instead of the editor content.
+let sqlOverrideStatement = null;
+
+function restoreViewAfterAbort() {
+    dom.loadingState.classList.add('hidden');
+    dom.dataViewer.classList.remove('hidden');
 }
 
 // ─── Pagination state ─────────────────────────────────────────────────────────
@@ -700,14 +711,37 @@ export async function executeQuery(append = false, forcedStartKey) {
             result = await api('POST', `/tables/${state.currentTable}/query`, params, { connection });
             if (!append) addToHistory('query', params);
         } else if (state.queryMode === 'sql') {
-            const statement = dom.sqlStatement.value.trim();
+            const statement = (sqlOverrideStatement || dom.sqlStatement.value).trim();
+            clearSqlError();
             if (!statement) {
                 showToast('SQL Statement is required', 'error');
-                dom.loadingState.classList.add('hidden');
-                dom.dataViewer.classList.remove('hidden');
+                restoreViewAfterAbort();
                 return;
             }
-            
+
+            const { kind, verb } = sqlStatementKind(statement);
+            if (kind === 'write') {
+                // INSERT / UPDATE / DELETE modify data: confirm, run, then refresh the grid
+                // by re-running the last SELECT of this tab (if any).
+                const ok = confirm(`${verb} modifies data in "${state.currentTable}".\n\nRun this statement?`);
+                if (!ok) { restoreViewAfterAbort(); return; }
+
+                const writeResult = await api('POST', `/execute-statement`, { statement }, { connection });
+                addToHistory('sql', { statement });
+                const { wcu, cost } = trackWrite(state.currentTable, writeResult.consumedCapacity, 'partiql', Date.now() - _t0, 1);
+                showToast(`${verb} executed${wcu > 0 ? ` · ${fmtCU(wcu)} WCU · ${fmtCost(cost)}` : ''}`, 'success');
+
+                if (state.activeTabId !== initiatingTabId) return;
+                if (lastSqlReadStatement) {
+                    sqlOverrideStatement = lastSqlReadStatement;
+                    try { await executeQuery(false); } finally { sqlOverrideStatement = null; }
+                } else {
+                    restoreViewAfterAbort();
+                    dom.resultInfo.textContent = `${verb} executed · run a SELECT to see the data`;
+                }
+                return;
+            }
+
             const params = { statement };
             // Save base params for full-table export (no pagination token)
             state.lastQueryEndpoint = `/execute-statement`;
@@ -720,6 +754,7 @@ export async function executeQuery(append = false, forcedStartKey) {
             if (!append) addToHistory('sql', params);
             // Only update pagination state if still on the same tab
             if (state.activeTabId === initiatingTabId) {
+                lastSqlReadStatement = statement;
                 state.nextToken = result.nextToken || null;
                 state.lastEvaluatedKey = state.nextToken; 
             }
@@ -823,6 +858,7 @@ export async function executeQuery(append = false, forcedStartKey) {
         if (state.activeTabId === initiatingTabId) {
             dom.loadingState.classList.add('hidden');
             dom.dataViewer.classList.remove('hidden');
+            if (state.queryMode === 'sql') showSqlError(err.message);
             showToast(`Query error: ${err.message}`, 'error');
         }
     }
@@ -852,6 +888,7 @@ export function loadQueryFromHistory(entry) {
 
     if (type === 'sql') {
         dom.sqlStatement.value = params.statement;
+        refreshSqlHighlight();
     } else if (type === 'query') {
         dom.queryPkValue.value = params.expressionAttributeValues[':pkval'];
         
@@ -907,6 +944,7 @@ export function getQueryState() {
         scanExprNames: dom.scanExprNames.value,
         scanExprValues: dom.scanExprValues.value,
         sqlStatement: dom.sqlStatement.value,
+        lastSqlReadStatement,
         queryMode: state.queryMode,
         // Pagination state — saved per tab
         currentPage,
@@ -934,6 +972,8 @@ export function setQueryState(q) {
     dom.scanExprValues.value = s.scanExprValues || '';
 
     dom.sqlStatement.value = s.sqlStatement || '';
+    lastSqlReadStatement = s.lastSqlReadStatement || '';
+    refreshSqlHighlight();
 
     // Restore pagination state per tab
     currentPage  = s.currentPage || 1;

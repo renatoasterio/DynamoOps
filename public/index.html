@@ -434,10 +434,32 @@
                 <div id="sql-fields" class="hidden">
                     <div class="filter-row">
                         <div class="field full-width">
-                            <label>PartiQL Statement (ANSI SQL)</label>
-                            <div class="sql-editor-container" style="position: relative; width: 100%;">
-                                <textarea id="sql-statement" rows="3" placeholder="SELECT * FROM &quot;table_name&quot; WHERE ..."></textarea>
+                            <div class="sql-toolbar">
+                                <div class="sql-toolbar-left">
+                                    <label for="sql-statement">PartiQL statement</label>
+                                    <span id="sql-kind-pill" class="sql-kind-pill sql-kind-read hidden"></span>
+                                </div>
+                                <div class="sql-toolbar-right">
+                                    <div class="sql-templates-wrap">
+                                        <button type="button" id="sql-templates-btn" class="sql-tool-btn" title="Insert a statement template for this table">📋 Templates ▾</button>
+                                        <ul id="sql-templates-menu" class="dropdown-menu sql-templates-menu hidden"></ul>
+                                    </div>
+                                    <button type="button" id="sql-format-btn" class="sql-tool-btn" title="Format: uppercase keywords, one clause per line">✨ Format</button>
+                                    <button type="button" id="sql-clear-btn" class="sql-tool-btn" title="Clear the editor">Clear</button>
+                                    <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ql-reference.html" target="_blank" class="sql-tool-link" title="PartiQL for DynamoDB reference">Docs ↗</a>
+                                </div>
+                            </div>
+                            <div class="sql-editor-container">
+                                <pre id="sql-highlight" class="sql-highlight" aria-hidden="true"><code id="sql-highlight-code"></code></pre>
+                                <textarea id="sql-statement" rows="4" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="SELECT * FROM &quot;table_name&quot; WHERE ..."></textarea>
                                 <ul id="sql-autocomplete" class="dropdown-menu hidden"></ul>
+                            </div>
+                            <div id="sql-error" class="sql-error hidden" role="alert"></div>
+                            <div class="sql-hint">
+                                <span><kbd id="sql-mod-key">⌘</kbd>+<kbd>↩</kbd> run</span>
+                                <span><kbd>Tab</kbd> / <kbd>↩</kbd> accept suggestion</span>
+                                <span><kbd>Esc</kbd> close</span>
+                                <span>Names with dashes need double quotes: <code>"my-table"</code></span>
                             </div>
                         </div>
                     </div>

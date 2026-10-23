@@ -20,7 +20,7 @@ const EXPECTED_MACHINE_HASH = crypto
     .update(MOCK_MACHINE_ID)
     .digest('hex');
 
-let requirePlan, licenseService;
+let requirePlan, requirePlanWhen, licenseService;
 
 beforeAll(async () => {
     fs.mkdirSync(TEST_DIR, { recursive: true });
@@ -28,7 +28,7 @@ beforeAll(async () => {
     jest.spyOn(os, 'homedir').mockReturnValue(TEST_DIR);
 
     licenseService = require('../src/backend/services/licenseService');
-    ({ requirePlan } = require('../src/backend/middleware/license'));
+    ({ requirePlan, requirePlanWhen } = require('../src/backend/middleware/license'));
 });
 
 afterEach(() => {
@@ -148,5 +148,53 @@ describe('requirePlan middleware', () => {
         await middleware(req, res, next);
 
         expect(next).toHaveBeenCalled();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// requirePlanWhen — conditional gate (PartiQL: SELECT free, writes need Pro)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('requirePlanWhen middleware', () => {
+    const { isWriteStatement } = require('../src/backend/utils/partiql');
+    const gate = () => requirePlanWhen((req) => isWriteStatement(req.body && req.body.statement), 'pro');
+
+    test('free user: SELECT passes through (predicate false → no gate)', async () => {
+        const { req, res, next } = mockReqRes();
+        req.body = { statement: 'SELECT * FROM "t"' };
+        await gate()(req, res, next);
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(res._status).toBeNull();
+    });
+
+    test('free user: INSERT is blocked with 402 and the usual upgrade payload', async () => {
+        const { req, res, next } = mockReqRes();
+        req.body = { statement: "INSERT INTO \"t\" VALUE {'pk': '1'}" };
+        await gate()(req, res, next);
+        expect(next).not.toHaveBeenCalled();
+        expect(res._status).toBe(402);
+        expect(res._json.requiredPlan).toBe('pro');
+        expect(res._json.currentPlan).toBe('free');
+        expect(res._json.upgradeUrl).toContain('dynamoops.io');
+    });
+
+    test('pro user: DELETE passes and req.license is populated', async () => {
+        const token = await signTestJWT({
+            key: 'DYNAMO-PRO-MW', plan: 'pro', machineId: EXPECTED_MACHINE_HASH, email: 'pro@example.com',
+        });
+        await licenseService.saveLicense(token);
+
+        const { req, res, next } = mockReqRes();
+        req.body = { statement: 'DELETE FROM "t" WHERE "pk" = \'1\'' };
+        await gate()(req, res, next);
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(req.license.plan).toBe('pro');
+    });
+
+    test('a throwing predicate is treated as "gate does not apply"', async () => {
+        const mw = requirePlanWhen(() => { throw new Error('boom'); }, 'pro');
+        const { req, res, next } = mockReqRes();
+        await mw(req, res, next);
+        expect(next).toHaveBeenCalledTimes(1);
     });
 });
