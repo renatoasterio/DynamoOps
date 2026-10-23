@@ -6,6 +6,7 @@ const connectionController = require('../controllers/connectionController');
 const tableController      = require('../controllers/tableController');
 const itemController       = require('../controllers/itemController');
 const importController     = require('../controllers/importController');
+const ssoController        = require('../controllers/ssoController');
 const { requirePlan, requirePlanWhen } = require('../middleware/license');
 const { isWriteStatement } = require('../utils/partiql');
 
@@ -16,6 +17,15 @@ router.get('/config', (req, res) => connectionController.getConfig(req, res));
 router.post('/connect', (req, res) => connectionController.connect(req, res));
 router.post('/disconnect', (req, res) => connectionController.disconnect(req, res));
 router.post('/assume-role', (req, res) => connectionController.handleAssumeRole(req, res));
+
+// ─── AWS IAM Identity Center (SSO) sign-in via browser ─
+router.get('/sso/config',    (req, res) => ssoController.getConfig(req, res));
+router.post('/sso/start',    (req, res) => ssoController.start(req, res));
+router.post('/sso/poll',     (req, res) => ssoController.poll(req, res));
+router.get('/sso/accounts',  (req, res) => ssoController.accounts(req, res));
+router.get('/sso/roles',     (req, res) => ssoController.roles(req, res));
+router.post('/sso/connect',  (req, res) => ssoController.connect(req, res));
+router.post('/sso/signout',  (req, res) => ssoController.signOut(req, res));
 
 // ─── Tables ───────────────────────────────────────────
 router.get('/tables', (req, res) => tableController.list(req, res));

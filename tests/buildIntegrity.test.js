@@ -170,6 +170,12 @@ describe('Build integrity', () => {
             expect(html).toContain('id="login-license-bar"');
         });
 
+        test('has the AWS SSO sign-in pane and tab', () => {
+            expect(html).toContain('data-tab="sso"');
+            expect(html).toContain('id="login-pane-sso"');
+            expect(html).toContain('id="login-sso-start-url"');
+        });
+
         test('has title DynamoOps', () => {
             expect(html).toContain('DynamoOps');
         });
@@ -277,6 +283,11 @@ describe('Build integrity', () => {
 
         test('imports requirePlan', () => {
             expect(routes).toContain('requirePlan');
+        });
+
+        test('exposes the SSO sign-in routes', () => {
+            ['/sso/start', '/sso/poll', '/sso/accounts', '/sso/roles', '/sso/connect', '/sso/signout', '/sso/config']
+                .forEach((r) => expect(routes).toContain(r));
         });
 
         test('PartiQL writes require pro (SELECT stays free)', () => {

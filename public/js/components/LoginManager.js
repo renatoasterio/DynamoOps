@@ -3,6 +3,7 @@ import { api } from '../api/apiClient.js';
 import { state, config } from '../state/store.js';
 import { showToast } from '../utils/toast.js';
 import { loadTables } from './Sidebar.js';
+import { initSsoLogin, handleSsoSubmit, connectSsoProfile, prefillSso, resetSsoFlow, submitLabel as ssoSubmitLabel } from './SsoLogin.js';
 
 // ─── Env tag helpers ──────────────────────────────────────────────────────────
 function getEnvPickerValue(pickerId) {
@@ -125,7 +126,7 @@ export function initLoginManager() {
     }
 
     // Env tag pickers — toggle active on click
-    ['#login-env-picker', '#login-ar-env-picker'].forEach(sel => {
+    ['#login-env-picker', '#login-ar-env-picker', '#login-sso-env-picker'].forEach(sel => {
         $(sel)?.querySelectorAll('.env-pick-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 btn.closest('.env-picker').querySelectorAll('.env-pick-btn')
@@ -196,6 +197,20 @@ export function initLoginManager() {
         showToast('Assume Role profile details loaded. Click Connect to proceed.', 'info');
     });
 
+    // AWS SSO (IAM Identity Center) sign-in via browser
+    initSsoLogin({
+        resetPreviousSession,
+        getEnvPickerValue,
+        setEnvPicker,
+        onConnected: finishSsoConnect,
+    });
+    document.addEventListener('requestSsoLogin', (e) => {
+        showLogin();
+        switchTab('sso');
+        prefillSso(e.detail || {});
+        showToast('SSO profile loaded. Click "Sign in with AWS in browser".', 'info');
+    });
+
     // Handle profiles update event
     document.addEventListener('profilesUpdated', () => {
         if (activeTab === 'profiles') renderLoginProfiles();
@@ -229,8 +244,14 @@ function switchTab(tabId) {
         if (tabId === 'profiles') {
             dom.submitBtn.classList.add('hidden');
             if (dom.testBtn) dom.testBtn.classList.add('hidden');
+        } else if (tabId === 'sso') {
+            dom.submitBtn.classList.remove('hidden');
+            dom.submitBtn.disabled = false;
+            if (dom.testBtn) dom.testBtn.classList.add('hidden');
+            dom.submitBtn.textContent = ssoSubmitLabel();
         } else {
             dom.submitBtn.classList.remove('hidden');
+            dom.submitBtn.disabled = false;
             if (dom.testBtn) dom.testBtn.classList.remove('hidden');
             dom.submitBtn.textContent = tabId === 'assume' ? 'Assume Role & Connect' : 'Connect to DynamoDB';
         }
@@ -245,7 +266,9 @@ function getRecentConnections() {
 
 function trackRecentConnection(params) {
     let recent = getRecentConnections();
-    const id = params.roleArn ? `recent-ar-${params.roleArn}` : `recent-${params.region}-${params.awsProfile}-${params.endpoint || ''}`;
+    const id = params.sso
+        ? `recent-sso-${params.sso.startUrl}-${params.sso.accountId}-${params.sso.roleName}`
+        : params.roleArn ? `recent-ar-${params.roleArn}` : `recent-${params.region}-${params.awsProfile}-${params.endpoint || ''}`;
     recent = recent.filter(r => r.id !== id);
     recent.unshift({ ...params, id, timestamp: Date.now() });
     recent = recent.slice(0, 5);
@@ -328,8 +351,8 @@ function renderLoginProfiles() {
         html += recent.map(r => `
             <div class="saved-profile-item-login recent" data-id="${r.id}" data-type="recent">
                 <div class="profile-info">
-                    <div class="profile-name">${r.roleArn ? '🛡️ Assume Role' : '⚡ Quick Connect'}</div>
-                    <div class="profile-meta">${r.region} · ${r.roleArn ? r.roleArn.split('/').pop() : r.awsProfile}</div>
+                    <div class="profile-name">${r.sso ? '🌐 AWS SSO' : r.roleArn ? '🛡️ Assume Role' : '⚡ Quick Connect'}</div>
+                    <div class="profile-meta">${r.region} · ${r.sso ? `${r.sso.accountName || r.sso.accountId} / ${r.sso.roleName}` : r.roleArn ? r.roleArn.split('/').pop() : r.awsProfile}</div>
                 </div>
                 <div class="profile-action">→</div>
             </div>
@@ -344,7 +367,7 @@ function renderLoginProfiles() {
                 <div class="saved-profile-item-login" data-id="${name}" data-type="saved">
                     <div class="profile-info">
                         <div class="profile-name">${name}</div>
-                        <div class="profile-meta">${p.roleArn ? '🛡️ ' : ''}${p.region} · ${p.roleArn ? p.roleArn.split('/').pop() : p.awsProfile}</div>
+                        <div class="profile-meta">${p.sso ? '🌐 ' : p.roleArn ? '🛡️ ' : ''}${p.region} · ${p.sso ? `${p.sso.accountName || p.sso.accountId} / ${p.sso.roleName}` : p.roleArn ? p.roleArn.split('/').pop() : p.awsProfile}</div>
                     </div>
                     <div class="profile-action">⚡</div>
                 </div>
@@ -369,7 +392,10 @@ function renderLoginProfiles() {
 
             try {
                 const envTag = p.envTag || 'none';
-                if (p.roleArn) {
+                if (p.sso) {
+                    switchTab('sso');
+                    await connectSsoProfile({ ...p, envTag });
+                } else if (p.roleArn) {
                     await assumeRole(p.roleArn, p.sessionName, p.region, p.awsProfile, false, envTag);
                 } else {
                     await connectWithParams(p.region, p.awsProfile, p.endpoint, false, envTag);
@@ -396,18 +422,70 @@ async function handleConnect() {
             const roleArn = resolveRoleArn();
             const envTag  = getEnvPickerValue('#login-ar-env-picker');
             await assumeRole(roleArn, dom.arSession?.value.trim() || 'dev-session', dom.arRegion.value, dom.arProfile.value.trim(), true, envTag);
+        } else if (activeTab === 'sso') {
+            await handleSsoSubmit();
         }
     } catch (err) {
         dom.error.textContent = err.message;
         dom.error.classList.remove('hidden');
+        dom.error.scrollIntoView({ block: 'nearest' });
     } finally {
-        dom.submitBtn.disabled = false;
-        dom.submitBtn.innerHTML = originalText;
+        if (activeTab === 'sso') {
+            // SsoLogin manages the button label/state per step
+            dom.submitBtn.textContent = ssoSubmitLabel();
+            dom.submitBtn.disabled = dom.submitBtn.textContent.startsWith('Waiting');
+        } else {
+            dom.submitBtn.disabled = false;
+            dom.submitBtn.innerHTML = originalText;
+        }
     }
+}
+
+/** Post-connect UI for an SSO session (mirrors assumeRole's success path). */
+function finishSsoConnect(result, p) {
+    if (p.save && p.profileName) {
+        const profiles = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
+        profiles[p.profileName] = {
+            sso: { startUrl: p.startUrl, ssoRegion: p.ssoRegion, accountId: p.accountId, accountName: p.accountName, roleName: p.roleName },
+            region: p.region, awsProfile: 'sso', envTag: p.envTag,
+        };
+        localStorage.setItem('dynamo-gui-profiles', JSON.stringify(profiles));
+        document.dispatchEvent(new CustomEvent('profilesUpdated'));
+        showToast(`SSO profile "${p.profileName}" saved locally.`, 'info');
+    }
+    trackRecentConnection({
+        sso: { startUrl: p.startUrl, ssoRegion: p.ssoRegion, accountId: p.accountId, accountName: p.accountName, roleName: p.roleName },
+        region: p.region, awsProfile: 'sso', envTag: p.envTag,
+    });
+
+    state.connected = true;
+    config.region   = p.region;
+    config.profile  = 'sso';
+    config.endpoint = '';
+    config.envTag   = p.envTag;
+    showEnvBadge(p.envTag);
+    updateConnInfoBadge(p.region, '');
+
+    const connStatus = $('#conn-status');
+    if (connStatus) {
+        connStatus.className = 'status connected';
+        connStatus.textContent = 'Connected';
+    }
+    if (result?.role?.roleArn) {
+        document.dispatchEvent(new CustomEvent('roleAssumed', { detail: { roleArn: result.role.roleArn } }));
+    }
+    // Role credentials are renewed server-side while the SSO token lasts, so no
+    // countdown prompt is needed here.
+    clearSessionTimer();
+
+    showToast(`Signed in as ${p.roleName} @ ${p.accountName || p.accountId}`, 'success');
+    hideLogin();
+    loadTables();
 }
 
 async function handleTestConnection() {
     if (!dom.error || !dom.testBtn) return;
+    if (activeTab === 'sso') return; // no test step: the sign-in itself validates the session
     dom.error.classList.add('hidden');
     dom.testBtn.disabled = true;
     const originalText = dom.testBtn.innerHTML;
@@ -434,6 +512,7 @@ async function handleTestConnection() {
     } catch (err) {
         dom.error.textContent = `Test failed: ${err.message}`;
         dom.error.classList.remove('hidden');
+        dom.error.scrollIntoView({ block: 'nearest' });
     } finally {
         dom.testBtn.disabled = false;
         dom.testBtn.innerHTML = originalText;
@@ -784,4 +863,5 @@ export function showLogin() {
 
     if (activeTab === 'profiles') renderLoginProfiles();
     if (activeTab === 'assume')   renderRoleHistory();
+    if (activeTab === 'sso')      resetSsoFlow();
 }

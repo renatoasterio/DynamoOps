@@ -42,6 +42,7 @@
                 <button class="login-tab active" data-tab="quick">Quick Connect</button>
                 <button class="login-tab" data-tab="profiles">Saved Profiles</button>
                 <button class="login-tab" data-tab="assume">Assume Role</button>
+                <button class="login-tab" data-tab="sso">AWS SSO</button>
             </div>
 
             <div class="login-content-wrapper">
@@ -161,6 +162,91 @@
                     <div id="ar-role-history" class="ar-role-history hidden">
                         <div class="ar-history-label">Histórico de funções</div>
                         <div id="ar-history-list" class="ar-history-list"></div>
+                    </div>
+                </div>
+
+                <!-- AWS IAM Identity Center (SSO): sign in with the browser, come back connected -->
+                <div id="login-pane-sso" class="login-form-pane hidden">
+                    <div id="login-sso-form">
+                        <p class="sso-intro">Sign in on the AWS access portal in your browser. When you finish, DynamoOps picks up the session automatically — no access keys needed.</p>
+                        <div id="login-sso-profiles" class="sso-chips hidden"></div>
+                        <div class="form-group">
+                            <label>SSO start URL <span class="form-hint">IAM Identity Center access portal</span></label>
+                            <input type="text" id="login-sso-start-url" placeholder="https://my-org.awsapps.com/start" autocomplete="off" spellcheck="false" />
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>SSO region</label>
+                                <select id="login-sso-region">
+                                    <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                                <option value="us-east-2">us-east-2 (Ohio)</option>
+                                <option value="us-west-1">us-west-1 (N. California)</option>
+                                <option value="us-west-2">us-west-2 (Oregon)</option>
+                                <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                                <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+                                <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>DynamoDB region</label>
+                                <select id="login-sso-db-region">
+                                    <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                                <option value="us-east-2">us-east-2 (Ohio)</option>
+                                <option value="us-west-1">us-west-1 (N. California)</option>
+                                <option value="us-west-2">us-west-2 (Oregon)</option>
+                                <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                                <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+                                <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Environment</label>
+                            <div class="env-picker" id="login-sso-env-picker">
+                                <button type="button" class="env-pick-btn env-pick-none active" data-env="none">None</button>
+                                <button type="button" class="env-pick-btn env-pick-dev" data-env="dev">Dev</button>
+                                <button type="button" class="env-pick-btn env-pick-qa" data-env="qa">QA</button>
+                                <button type="button" class="env-pick-btn env-pick-staging" data-env="staging">Staging</button>
+                                <button type="button" class="env-pick-btn env-pick-prod" data-env="prod">Prod</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="login-sso-wait" class="sso-wait hidden">
+                        <div class="spinner"></div>
+                        <div class="sso-wait-title">Finish signing in on the AWS page</div>
+                        <p class="sso-wait-text">A browser tab was opened. Approve the request there and come back — this screen updates by itself.</p>
+                        <div class="sso-code">Confirmation code <strong id="login-sso-code">…</strong></div>
+                        <div class="sso-links">
+                            <a href="#" id="login-sso-reopen" target="_blank" rel="noopener">Open the page again</a>
+                            <span>·</span>
+                            <a href="#" id="login-sso-cancel">Cancel</a>
+                        </div>
+                    </div>
+
+                    <div id="login-sso-pick" class="hidden">
+                        <div id="login-sso-pick-info" class="sso-pick-info"></div>
+                        <div class="form-group">
+                            <label>AWS account</label>
+                            <select id="login-sso-account"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Role <span class="form-hint">permission set</span></label>
+                            <select id="login-sso-role"></select>
+                        </div>
+                        <div class="form-group-checkbox">
+                            <input type="checkbox" id="login-sso-save" />
+                            <label for="login-sso-save">Save profile</label>
+                        </div>
+                        <div id="login-sso-name-group" class="form-group hidden">
+                            <label>Profile Name</label>
+                            <input type="text" id="login-sso-save-name" placeholder="e.g. Prod — AdminAccess" />
+                        </div>
+                        <div class="sso-links">
+                            <a href="#" id="login-sso-back">← Change start URL</a>
+                            <span>·</span>
+                            <a href="#" id="login-sso-signout">Forget this SSO session</a>
+                        </div>
                     </div>
                 </div>
 

@@ -45,7 +45,9 @@ export function initProfileManager() {
         if (profileInput) profileInput.value = profile.awsProfile || 'default';
         if (endpointInput) endpointInput.value = profile.endpoint || '';
 
-        if (profile.roleArn) {
+        if (profile.sso) {
+            document.dispatchEvent(new CustomEvent('requestSsoLogin', { detail: profile }));
+        } else if (profile.roleArn) {
             // It's an Assume Role profile
             document.dispatchEvent(new CustomEvent('requestAssumeRole', { detail: profile }));
         }
@@ -126,8 +128,8 @@ export function initProfileManager() {
                     <div>
                         <div class="profile-name">${name}</div>
                         <div class="profile-detail">
-                            ${p.roleArn ? '🛡️ ' + p.region : p.region} · 
-                            ${p.roleArn ? p.roleArn.split('/').pop() : p.awsProfile}
+                            ${p.sso ? '🌐 ' + p.region : p.roleArn ? '🛡️ ' + p.region : p.region} · 
+                            ${p.sso ? `${p.sso.accountName || p.sso.accountId} / ${p.sso.roleName}` : p.roleArn ? p.roleArn.split('/').pop() : p.awsProfile}
                             ${p.endpoint ? ' · ' + p.endpoint : ''}
                         </div>
                     </div>
