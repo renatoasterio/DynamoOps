@@ -101,8 +101,13 @@ describe('Build integrity', () => {
             expect(mainJs).toContain("license:deactivate");
         });
 
-        test('activates against dynamoops.io', () => {
-            expect(mainJs).toContain("dynamoops.io/api/license/activate");
+        test('activates against the configured LICENSE_SERVER', () => {
+            // URL now comes from the LICENSE_SERVER_URL env var (set by
+            // .env.production to https://dynamoops.io). The template literal
+            // uses a LICENSE_SERVER constant declared at the top of the file.
+            expect(mainJs).toContain("process.env.LICENSE_SERVER_URL");
+            expect(mainJs).toContain("'https://dynamoops.io'"); // fallback default
+            expect(mainJs).toContain("${LICENSE_SERVER}/api/license/activate");
         });
     });
 

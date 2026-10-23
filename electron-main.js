@@ -5,6 +5,11 @@ const fs   = require('fs');
 const isMac  = process.platform === 'darwin';
 const isProd = app.isPackaged;   // true when installed/built, false in dev
 
+// Test hook: isolate E2E runs by moving license.json to a disposable dir.
+if (process.env.DYNAMO_TEST_USER_DATA_DIR) {
+    app.setPath('userData', process.env.DYNAMO_TEST_USER_DATA_DIR);
+}
+
 // ─── Load environment variables from .env / .env.production ─────────
 (function loadEnvFile() {
     const envFile = isProd ? '.env.production' : '.env';
@@ -160,6 +165,8 @@ function createMenu() {
 const licenseService  = require('./src/backend/services/licenseService');
 const { machineIdSync } = require('node-machine-id');
 
+const LICENSE_SERVER = process.env.LICENSE_SERVER_URL || 'https://dynamoops.io';
+
 ipcMain.handle('license:status', async () => {
     return await licenseService.getLicenseStatus();
 });
@@ -171,7 +178,7 @@ ipcMain.handle('license:activate', async (_, { key }) => {
             .update(machineIdSync({ original: true }))
             .digest('hex');
 
-        const res = await fetch('https://dynamoops.io/api/license/activate', {
+        const res = await fetch(`${LICENSE_SERVER}/api/license/activate`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ key, machineId }),
@@ -182,9 +189,97 @@ ipcMain.handle('license:activate', async (_, { key }) => {
         if (!res.ok) return { success: false, error: data.error };
 
         await licenseService.saveLicense(data.token);
-        return { success: true, plan: data.plan, email: data.email };
+        return { success: true, plan: data.plan, email: data.email, role: data.role };
     } catch (err) {
         return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+// ─── Team management IPC ──────────────────────────────────────────────
+
+ipcMain.handle('team:list-members', async () => {
+    try {
+        const status = await licenseService.getLicenseStatus();
+        if (status.plan !== 'team' || !status._rawToken) {
+            return { success: false, error: 'Team plan required' };
+        }
+        const res = await fetch(`${LICENSE_SERVER}/api/team/members`, {
+            method:  'GET',
+            headers: { Authorization: `Bearer ${status._rawToken}` },
+            signal:  AbortSignal.timeout(10000),
+        });
+        const data = await res.json();
+        if (!res.ok) return { success: false, error: data.error };
+        return { success: true, ...data };
+    } catch (err) {
+        return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+ipcMain.handle('team:invite', async (_, { email }) => {
+    try {
+        const status = await licenseService.getLicenseStatus();
+        if (status.plan !== 'team' || !status._rawToken) {
+            return { success: false, error: 'Team plan required' };
+        }
+        const res = await fetch(`${LICENSE_SERVER}/api/team/invite`, {
+            method:  'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${status._rawToken}`,
+            },
+            body:   JSON.stringify({ email }),
+            signal: AbortSignal.timeout(15000),
+        });
+        const data = await res.json();
+        if (!res.ok) return { success: false, error: data.error };
+        return { success: true, member: data.member };
+    } catch (err) {
+        return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+ipcMain.handle('team:remove-member', async (_, { email }) => {
+    try {
+        const status = await licenseService.getLicenseStatus();
+        if (status.plan !== 'team' || !status._rawToken) {
+            return { success: false, error: 'Team plan required' };
+        }
+        const res = await fetch(`${LICENSE_SERVER}/api/team/members/${encodeURIComponent(email)}`, {
+            method:  'DELETE',
+            headers: { Authorization: `Bearer ${status._rawToken}` },
+            signal:  AbortSignal.timeout(10000),
+        });
+        const data = await res.json();
+        if (!res.ok) return { success: false, error: data.error };
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: 'Network error. Check your connection.' };
+    }
+});
+
+// ─── Machine transfer IPC ──────────────────────────────────────────────
+ipcMain.handle('license:transfer-request', async (_, { key }) => {
+    try {
+        return await licenseService.requestTransfer(key);
+    } catch (err) {
+        return { success: false, error: err.message || 'Network error' };
+    }
+});
+
+ipcMain.handle('license:transfer-confirm', async (_, { key, code }) => {
+    try {
+        return await licenseService.confirmTransfer(key, code);
+    } catch (err) {
+        return { success: false, error: err.message || 'Network error' };
+    }
+});
+
+ipcMain.handle('license:history', async () => {
+    try {
+        return await licenseService.getActivationHistory();
+    } catch (err) {
+        return { success: false, error: err.message || 'Network error' };
     }
 });
 
@@ -197,7 +292,7 @@ ipcMain.handle('license:deactivate', async () => {
                 .update(machineIdSync({ original: true }))
                 .digest('hex');
             // Best-effort deactivation on server
-            await fetch('https://dynamoops.io/api/license/deactivate', {
+            await fetch(`${LICENSE_SERVER}/api/license/deactivate`, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({ token: status._rawToken, machineId }),
@@ -215,6 +310,15 @@ ipcMain.handle('license:deactivate', async () => {
 app.whenReady().then(() => {
     createMenu();
     createWindow();
+
+    // Kick off periodic license refresh. If the server reports that this
+    // machine's slot was taken over by another, we notify the renderer so
+    // the UI can alert the user and drop them to the free plan.
+    licenseService.startPeriodicRefresh(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('license:revoked');
+        }
+    });
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
