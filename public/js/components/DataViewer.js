@@ -79,6 +79,19 @@ export function initDataViewer() {
         resetDataViewer();
     });
 
+    // Tabs load their table description themselves (TabManager), so keep the
+    // info bar (name, item count, key/GSI tags) in sync with the active tab here.
+    document.addEventListener('populateQueryFieldsRequest', (e) => {
+        if (e.detail?.table) renderTableInfo(e.detail.table);
+    });
+    document.addEventListener('tabChanged', () => {
+        dom.tableName.textContent = state.currentTable || '';
+        if (!state.tableInfo) {
+            dom.tableItemCount.textContent = '';
+            dom.schemaInfo.innerHTML = '';
+        }
+    });
+
     document.addEventListener('reloadTableInfoRequest', async () => {
         if (!state.currentTable) return;
         try {
@@ -194,6 +207,7 @@ export async function selectTable(name) {
 }
 
 function renderTableInfo(table) {
+    dom.tableName.textContent = table.TableName || state.currentTable || '';
     const keySchema = table.KeySchema || [];
     const attrDefs = table.AttributeDefinitions || [];
     const count = table.ItemCount || 0;

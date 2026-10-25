@@ -765,7 +765,7 @@ header .logo {
 
 header .logo strong {
     color: var(--primary);
-    background: var(--bg-gradient);
+    background: var(--accent-gradient);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;

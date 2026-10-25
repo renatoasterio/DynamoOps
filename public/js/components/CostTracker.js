@@ -176,6 +176,8 @@ function _bindUI() {
         session.alertFired = false;
         localStorage.setItem('costTracker', JSON.stringify({ alertThreshold: val }));
         showToast(`Cost alert set at ${fmtCost(val)}`, 'success');
+        _checkThreshold();
+        _refreshPanel();
     });
 
     $('#cost-threshold-clear')?.addEventListener('click', () => {
