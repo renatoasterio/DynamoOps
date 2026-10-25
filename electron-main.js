@@ -10,6 +10,7 @@ process.env.PORT = String(PORT);
 require('./server');
 
 const APP_ORIGIN = `http://localhost:${PORT}`;
+const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write']);
 
 /** Only https links may leave the app (no file:, smb:, custom schemes…). */
 function openExternalSafely(url) {
@@ -152,8 +153,11 @@ function createMenu() {
 
 // ─── App lifecycle ───────────────────────────────────────────────────
 app.whenReady().then(() => {
-    // The app needs no camera, mic, geolocation, notifications…
-    session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+    // Only clipboard writes (the "Copy" buttons) are needed — deny everything
+    // else: camera, mic, geolocation, notifications…
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+        callback(ALLOWED_PERMISSIONS.has(permission));
+    });
 
     createMenu();
     createWindow();
