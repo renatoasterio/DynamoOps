@@ -47,10 +47,10 @@ function showAccessDeniedBanner(detail) {
     list.innerHTML = `
       <li class="sidebar-auth-error">
         <div class="sae-icon">🔒</div>
-        <div class="sae-title">Acesso negado</div>
+        <div class="sae-title">Access denied</div>
         <div class="sae-user">${escHtml(shortId)}</div>
-        <div class="sae-desc">Sem permissão para <code>dynamodb:ListTables</code>.<br>Use Assume Role para conectar com uma role que tenha acesso.</div>
-        <button class="sae-btn" id="sae-assume-btn">Assumir Role →</button>
+        <div class="sae-desc">No permission for <code>dynamodb:ListTables</code>.<br>Use Assume Role to connect with a role that has access.</div>
+        <button class="sae-btn" id="sae-assume-btn">Assume Role →</button>
       </li>`;
 
     $('#sae-assume-btn')?.addEventListener('click', () => switchToAssumeRole());

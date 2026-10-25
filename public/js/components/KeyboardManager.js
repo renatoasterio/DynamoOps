@@ -21,6 +21,14 @@ function handleKeydown(e) {
     const mod = e.metaKey || e.ctrlKey;
     if (!mod) return;
 
+    // Cmd/Ctrl+Shift+L — License window. Works everywhere (login screen too),
+    // even with focus inside an input.
+    if (e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        window.licenseManager?.showLicenseModal();
+        return;
+    }
+
     const tag = document.activeElement?.tagName;
     // Allow Cmd+Enter inside textareas (SQL editor), block other shortcuts in inputs
     const isInput = (tag === 'INPUT' || tag === 'SELECT') ||
@@ -29,8 +37,8 @@ function handleKeydown(e) {
     if (isInput && e.key.toLowerCase() !== 'enter') return;
 
     switch (e.key.toLowerCase()) {
-        case 'enter': // Cmd+Enter — Execute query
-            if (state.currentTable) {
+        case 'enter': // Cmd+Enter — Execute query (single handler; ItemManager defers to this one)
+            if (state.currentTable && !isAnyModalOpen()) {
                 e.preventDefault();
                 executeQuery(false);
             }
@@ -67,16 +75,17 @@ function handleKeydown(e) {
         case 'f': // Cmd+F — Focus table search
             if (!isInput) {
                 e.preventDefault();
-                const search = $('#table-search-input') || $('#sidebar-search');
+                const search = $('#table-search-input');
                 if (search) { search.focus(); search.select(); }
             }
             break;
 
-        case 'k': // Cmd+K — Focus sidebar table filter
+        case 'k': { // Cmd+K — Focus sidebar table filter
             e.preventDefault();
-            const sidebarSearch = $('#sidebar-search');
+            const sidebarSearch = $('#table-search');
             if (sidebarSearch) { sidebarSearch.focus(); sidebarSearch.select(); }
             break;
+        }
     }
 }
 
@@ -88,5 +97,6 @@ function navigateTabs(direction) {
 }
 
 function isAnyModalOpen() {
-    return !!document.querySelector('.modal-overlay:not(.hidden)');
+    // Generic modals share .modal-overlay; the item editor and delete dialogs have their own overlays.
+    return !!document.querySelector('.modal-overlay:not(.hidden), #modal-overlay:not(.hidden), #delete-overlay:not(.hidden)');
 }

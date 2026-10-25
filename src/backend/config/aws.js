@@ -6,6 +6,20 @@ const { fromIni } = require('@aws-sdk/credential-providers');
 // In-memory cache for clients
 const clientCache = new Map();
 
+// LocalStack accepts any credentials — users running against a local endpoint
+// rarely have a real ~/.aws/credentials file, so the SDK's default credential
+// chain fails with "Could not load credentials from any providers". Detecting
+// loopback endpoints and injecting dummy credentials fixes this cleanly.
+function isLocalEndpoint(endpoint) {
+    if (!endpoint) return false;
+    return /^(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal)(:\d+)?/i.test(endpoint.trim());
+}
+
+const LOCALSTACK_CREDENTIALS = {
+    accessKeyId: 'test',
+    secretAccessKey: 'test',
+};
+
 function buildClients(opts) {
     const dynamoClient = new DynamoDBClient(opts);
     const docClient = DynamoDBDocumentClient.from(dynamoClient, {
@@ -43,6 +57,10 @@ function getCachedClients(config, explicitCredentials) {
 
     const opts = { region: region || 'us-east-1' };
 
+    if (endpoint && endpoint.trim() !== '') {
+        opts.endpoint = endpoint.trim();
+    }
+
     // Only load a named profile explicitly. 'default' and empty string both
     // mean: use the SDK's default credential chain (same as CLI without --profile).
     if (profile && profile !== 'default') {
@@ -51,10 +69,10 @@ function getCachedClients(config, explicitCredentials) {
         } catch (e) {
             console.warn(`Failed to load profile ${profile}, falling back to default credentials`);
         }
-    }
-
-    if (endpoint && endpoint.trim() !== '') {
-        opts.endpoint = endpoint.trim();
+    } else if (isLocalEndpoint(opts.endpoint)) {
+        // LocalStack — bypass credential chain with dummy creds so machines
+        // without ~/.aws/credentials can still connect.
+        opts.credentials = LOCALSTACK_CREDENTIALS;
     }
 
     const clients = buildClients(opts);

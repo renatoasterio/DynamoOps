@@ -75,10 +75,10 @@ export function initItemTemplateManager() {
         const cleaned = editingFields.filter(f => f.name.trim());
         if (!cleaned.length) {
             deleteTemplate(state.currentTable);
-            showToast('Template removido', 'info');
+            showToast('Template removed', 'info');
         } else {
             saveTemplate(state.currentTable, cleaned);
-            showToast(`Template salvo com ${cleaned.length} campos`, 'success');
+            showToast(`Template saved with ${cleaned.length} fields`, 'success');
         }
         closeTemplateEditor();
         document.dispatchEvent(new CustomEvent('templateChanged'));
@@ -86,18 +86,18 @@ export function initItemTemplateManager() {
 
     $('#template-delete-btn')?.addEventListener('click', () => {
         deleteTemplate(state.currentTable);
-        showToast('Template removido', 'info');
+        showToast('Template removed', 'info');
         closeTemplateEditor();
         document.dispatchEvent(new CustomEvent('templateChanged'));
     });
 
     // Listen for table changes to update template button badge
-    document.addEventListener('tableSelected', updateTemplateBadge);
+    document.addEventListener('tabChanged', updateTemplateBadge);
     document.addEventListener('templateChanged', updateTemplateBadge);
 }
 
 function openTemplateEditor() {
-    if (!state.currentTable) { showToast('Selecione uma tabela primeiro', 'info'); return; }
+    if (!state.currentTable) { showToast('Select a table first', 'info'); return; }
     const overlay = $('#template-editor-overlay');
     if (!overlay) return;
 
@@ -137,7 +137,7 @@ function renderFieldRows() {
     if (!container) return;
 
     container.innerHTML = editingFields.length === 0
-        ? '<div class="tpl-empty-hint">Nenhum campo definido. Clique em "＋ Adicionar Campo" para começar.</div>'
+        ? '<div class="tpl-empty-hint">No fields defined. Click "＋ Add Field" to get started.</div>'
         : editingFields.map((f, i) => fieldRowHTML(f, i)).join('');
 
     // Bind row events
@@ -179,15 +179,15 @@ function fieldRowHTML(f, i) {
     ).join('');
 
     return `<div class="tpl-field-row ${f.isKey ? 'tpl-key-row' : ''}" draggable="true">
-      <span class="tpl-drag-handle" title="Arrastar para reordenar">⠿</span>
-      <input class="tpl-fname" type="text" placeholder="nome do campo" value="${escHtml(f.name)}" ${f.isKey ? 'readonly' : ''}/>
+      <span class="tpl-drag-handle" title="Drag to reorder">⠿</span>
+      <input class="tpl-fname" type="text" placeholder="field name" value="${escHtml(f.name)}" ${f.isKey ? 'readonly' : ''}/>
       <select class="tpl-ftype" ${f.isKey ? 'disabled' : ''}>${typeOptions}</select>
       ${defaultInputHTML(f)}
-      <label class="tpl-req-label" title="Campo obrigatório">
+      <label class="tpl-req-label" title="Required field">
         <input class="tpl-frequired" type="checkbox" ${f.required ? 'checked' : ''}/>
         <span>Req</span>
       </label>
-      ${f.isKey ? '<span class="tpl-key-badge">KEY</span>' : `<button class="tpl-remove-btn" title="Remover campo">✕</button>`}
+      ${f.isKey ? '<span class="tpl-key-badge">KEY</span>' : `<button class="tpl-remove-btn" title="Remove field">✕</button>`}
     </div>`;
 }
 

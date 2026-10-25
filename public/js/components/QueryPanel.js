@@ -4,7 +4,8 @@ import { api } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
 import { addToHistory } from './HistoryManager.js';
 import { getActiveTabConnection } from './TabManager.js';
-import { trackRead, fmtCost, fmtCU } from './CostTracker.js';
+import { trackRead, trackWrite, fmtCost, fmtCU } from './CostTracker.js';
+import { initSqlEditor, refreshSqlHighlight, sqlStatementKind, showSqlError, clearSqlError } from './SqlEditor.js';
 
 const dom = {
     modeScanBtn: $('#mode-scan-btn'),
@@ -45,7 +46,16 @@ const dom = {
 export function initQueryPanel() {
     dom.filterToggleBtn.addEventListener('click', () => {
         state.filterOpen = !state.filterOpen;
-        dom.filterPanel.classList.toggle('hidden', !state.filterOpen);
+        syncFilterPanel();
+    });
+
+    // Each tab remembers whether its filters were open. TabManager restores
+    // state.filterOpen on switch; the panel itself must follow, otherwise the
+    // previous tab's panel stays on screen and the toggle button gets out of
+    // step with it. With no tab left, the panel always closes.
+    document.addEventListener('tabChanged', (e) => {
+        if (!e.detail?.table) state.filterOpen = false;
+        syncFilterPanel();
     });
 
     dom.runBtn.addEventListener('click', () => executeQuery(false));
@@ -57,6 +67,7 @@ export function initQueryPanel() {
 
     initModeToggles();
     initSqlAutocomplete();
+    initSqlEditor({ textarea: dom.sqlStatement });
 
     dom.querySkOp.addEventListener('change', () => {
         dom.querySkValue2Field.style.display = dom.querySkOp.value === 'between' ? 'flex' : 'none';
@@ -83,6 +94,13 @@ export function initQueryPanel() {
             e.detail.tab.queryState = getQueryState();
         }
     });
+}
+
+/** Shows/hides the filter panel and marks the toggle button according to state.filterOpen. */
+export function syncFilterPanel() {
+    dom.filterPanel.classList.toggle('hidden', !state.filterOpen);
+    dom.filterToggleBtn.classList.toggle('active', !!state.filterOpen);
+    dom.filterToggleBtn.setAttribute('aria-expanded', state.filterOpen ? 'true' : 'false');
 }
 
 export function populateQueryFields(table) {
@@ -163,6 +181,7 @@ function initModeToggles() {
         if (!dom.sqlStatement.value.trim() && state.currentTable) {
             dom.sqlStatement.value = `SELECT * FROM "${state.currentTable}"`;
         }
+        refreshSqlHighlight();
     });
 }
 
@@ -203,6 +222,68 @@ function initSqlAutocomplete() {
 
     let activeSuggestions = [];
     let selectedIdx = -1;
+    let columnInfo = null; // attributes of the statement's target table (set per input)
+
+    // ── Column catalog of the table referenced by FROM / UPDATE / INTO ──
+    // Cached per connection + table: { columns, keyNames, typeMap } once loaded,
+    // a Promise while describe + sample scan are in flight.
+    const columnCache = new Map();
+
+    function targetTable(sql) {
+        const m = sql.match(/\b(?:FROM|UPDATE|INTO)\s+"([^"]+)"/i)
+               || sql.match(/\b(?:FROM|UPDATE|INTO)\s+([\w.-]+)/i);
+        return m ? m[1].split('.')[0] : state.currentTable;
+    }
+
+    function buildColumnInfo(tableInfo, attrNames) {
+        const keyNames = new Set((tableInfo?.KeySchema || []).map(k => k.AttributeName));
+        const typeMap  = Object.fromEntries((tableInfo?.AttributeDefinitions || []).map(a => [a.AttributeName, a.AttributeType]));
+        const columns  = [...new Set([...keyNames, ...Object.keys(typeMap), ...attrNames])];
+        return { columns, keyNames, typeMap };
+    }
+
+    function getColumnInfo(table) {
+        if (!table) return null;
+        const connection = getActiveTabConnection();
+        const cacheKey = `${JSON.stringify(connection || {})}|${table}`;
+        const cached = columnCache.get(cacheKey);
+        const loaded = cached && !(cached instanceof Promise) ? cached : null;
+
+        // Current table: data already on screen is the freshest source
+        if (table === state.currentTable && state.tableInfo) {
+            const keyCount = (state.tableInfo.KeySchema || []).length;
+            if (state.allColumns.length > keyCount || loaded) {
+                return buildColumnInfo(state.tableInfo, [...state.allColumns, ...(loaded?.columns || [])]);
+            }
+        } else if (loaded) {
+            return loaded;
+        }
+
+        if (!cached) {
+            const load = Promise.all([
+                api('GET', `/tables/${encodeURIComponent(table)}`, null, { connection }),
+                api('POST', `/tables/${encodeURIComponent(table)}/scan`, { limit: 50 }, { connection }),
+            ]).then(([desc, sample]) => {
+                const attrs = (sample.items || []).flatMap(Object.keys);
+                columnCache.set(cacheKey, buildColumnInfo(desc.table, attrs));
+                if (document.activeElement === dom.sqlStatement) handleInput();
+            }).catch(() => columnCache.delete(cacheKey));
+            columnCache.set(cacheKey, load);
+        }
+        // While loading, fall back to whatever is known about the current table
+        return table === state.currentTable && state.tableInfo
+            ? buildColumnInfo(state.tableInfo, state.allColumns)
+            : null;
+    }
+
+    // Token under the cursor. A quote only opens a token when it is unbalanced —
+    // text after a closing quote (FROM "t" WHERE …) is not inside quotes.
+    function currentWord(before) {
+        const openQuote = ['"', "'"].find(q => before.split(q).length % 2 === 0);
+        if (openQuote) return before.slice(before.lastIndexOf(openQuote));
+        const plainM = before.match(/[\w.]+$/);
+        return plainM ? plainM[0] : '';
+    }
 
     // ── Context detection ───────────────────────────────────────────
     function detectContext(textBeforeWord) {
@@ -215,11 +296,15 @@ function initSqlAutocomplete() {
 
         if (['FROM', 'UPDATE', 'INTO'].includes(last))       return 'table';
         if (last === 'SELECT')                                return 'column';
-        if (last === ',' && /\bSELECT\b/i.test(cleaned) && !/\bFROM\b/i.test(cleaned)) return 'column';
+        if (last.endsWith('('))                               return 'column'; // begins_with( / contains( …
         if (['WHERE', 'AND', 'OR', 'NOT'].includes(last))    return 'column_fn';
         if (last === 'BY')                                    return 'column'; // ORDER BY
         if (last === 'SET')                                   return 'column';
-        if (last === ',' && /\bSET\b/i.test(cleaned))        return 'column';
+        // Column lists: SELECT a, b … / SET a = 1, … / ORDER BY a, …
+        if (last.endsWith(',')) {
+            if (/\bSELECT\b/i.test(cleaned) && !/\bFROM\b/i.test(cleaned)) return 'column';
+            if (/\b(SET|BY)\b/i.test(cleaned))                             return 'column';
+        }
         if (['=', '<>', '!=', '>', '<', '>=', '<=', 'IN', 'BETWEEN'].includes(last)) return 'value';
 
         // Column name immediately after WHERE / AND / OR → suggest operator
@@ -251,26 +336,23 @@ function initSqlAutocomplete() {
             return 2;                                // contains
         }
 
-        // Tables
-        if (context === 'table' || isQuoted) {
+        // Tables — a quoted token only means a table where a table is expected
+        if (context === 'table' || (isQuoted && context === 'keyword')) {
             state.tables
                 .filter(t => !clean || t.toUpperCase().includes(clean))
                 .forEach(t => push(`"${t}"`, 'table'));
         }
 
         // Columns (PK/SK first, with type hint)
-        if (['column', 'column_fn', 'operator'].includes(context) || isQuoted) {
-            const keySchema = state.tableInfo?.KeySchema || [];
-            const keyNames  = new Set(keySchema.map(k => k.AttributeName));
-            const attrDefs  = state.tableInfo?.AttributeDefinitions || [];
-            const typeMap   = Object.fromEntries(attrDefs.map(a => [a.AttributeName, a.AttributeType]));
+        if (columnInfo && (['column', 'column_fn', 'operator'].includes(context) || isQuoted)) {
+            const { columns, keyNames, typeMap } = columnInfo;
 
             // Keys first
-            state.allColumns
+            columns
                 .filter(c => keyNames.has(c) && (!clean || c.toUpperCase().includes(clean)))
                 .forEach(c => push(`"${c}"`, 'key', typeMap[c] || ''));
             // Then regular columns
-            state.allColumns
+            columns
                 .filter(c => !keyNames.has(c) && (!clean || c.toUpperCase().includes(clean)))
                 .forEach(c => push(`"${c}"`, 'column', typeMap[c] || ''));
         }
@@ -306,11 +388,10 @@ function initSqlAutocomplete() {
             return state.tables.slice(0, 10).map(t => ({ text: `"${t}"`, type: 'table', hint: '' }));
         }
         if (context === 'column' || context === 'column_fn') {
-            const keySchema = state.tableInfo?.KeySchema || [];
-            const keyNames  = new Set(keySchema.map(k => k.AttributeName));
-            const attrDefs  = state.tableInfo?.AttributeDefinitions || [];
-            const typeMap   = Object.fromEntries(attrDefs.map(a => [a.AttributeName, a.AttributeType]));
-            const cols = state.allColumns.map(c => ({
+            const { columns = [], keyNames = new Set(), typeMap = {} } = columnInfo || {};
+            // Keys first
+            const ordered = [...columns.filter(c => keyNames.has(c)), ...columns.filter(c => !keyNames.has(c))];
+            const cols = ordered.map(c => ({
                 text: `"${c}"`,
                 type: keyNames.has(c) ? 'key' : 'column',
                 hint: typeMap[c] || '',
@@ -381,11 +462,7 @@ function initSqlAutocomplete() {
         const before = val.substring(0, cursor);
 
         // Find start of current token (quoted or plain)
-        const quotedM  = before.match(/"[^"]*$|'[^']*$/);
-        const plainM   = before.match(/[\w.]+$/);
-        const wordStart = quotedM
-            ? cursor - quotedM[0].length
-            : plainM ? cursor - plainM[0].length : cursor;
+        const wordStart = cursor - currentWord(before).length;
 
         const after          = val.substring(cursor);
         const trailingSpace  = text.endsWith('(') ? '' : ' ';
@@ -394,8 +471,7 @@ function initSqlAutocomplete() {
         const newCursor = wordStart + text.length + trailingSpace.length;
         ta.setSelectionRange(newCursor, newCursor);
 
-        ta.style.height = 'auto';
-        ta.style.height = ta.scrollHeight + 'px';
+        refreshSqlHighlight();
 
         hideDropdown();
         ta.focus();
@@ -406,19 +482,17 @@ function initSqlAutocomplete() {
         if (state.queryMode !== 'sql') return;
 
         const ta = dom.sqlStatement;
-        ta.style.height = 'auto';
-        ta.style.height = ta.scrollHeight + 'px';
-
         const val    = ta.value;
         const cursor = ta.selectionStart;
         const before = val.substring(0, cursor);
 
-        const quotedM    = before.match(/"[^"]*$|'[^']*$/);
-        const plainM     = before.match(/[\w.]+$/);
-        const word       = quotedM ? quotedM[0] : (plainM ? plainM[0] : '');
+        const word       = currentWord(before);
+        // Inside a 'string literal' there is nothing useful to suggest
+        if (word.startsWith("'")) { hideDropdown(); return; }
         const beforeWord = before.substring(0, before.length - word.length);
         const context    = detectContext(beforeWord);
         const cleanQuery = word.replace(/^["']/, '');
+        columnInfo = context === 'table' ? null : getColumnInfo(targetTable(val));
 
         const suggestions = word.length === 0
             ? getDefaults(context)
@@ -475,6 +549,18 @@ function initSqlAutocomplete() {
     });
 }
 
+// ─── SQL mode state ───────────────────────────────────────────────────────────
+// Last SELECT that ran in the active tab (saved per tab). After a successful
+// INSERT / UPDATE / DELETE it is re-run so the grid shows the effect.
+let lastSqlReadStatement = '';
+// When set, executeQuery runs this statement instead of the editor content.
+let sqlOverrideStatement = null;
+
+function restoreViewAfterAbort() {
+    dom.loadingState.classList.add('hidden');
+    dom.dataViewer.classList.remove('hidden');
+}
+
 // ─── Pagination state ─────────────────────────────────────────────────────────
 let currentPage   = 1;
 let pageKeyCache  = [null]; // pageKeyCache[0] = null (page 1 has no startKey)
@@ -487,57 +573,121 @@ function resetPagination() {
 
 async function goToPage(n) {
     if (n < 1) return;
-    currentPage = n;
-    // Ensure cache has entry for this page
-    const startKey = pageKeyCache[n - 1] ?? null;
-    state.lastEvaluatedKey = startKey;
-    await executeQuery(false, startKey);
+
+    // If we already have the key for page n, go directly
+    if (pageKeyCache[n - 1] !== undefined) {
+        currentPage = n;
+        const startKey = pageKeyCache[n - 1];
+        state.lastEvaluatedKey = startKey;
+        await executeQuery(false, startKey);
+        return;
+    }
+
+    // Otherwise, fetch intermediate pages sequentially to build the key chain
+    // Start from the last known page key
+    const lastKnownIdx = pageKeyCache.length - 1; // index of last cached key
+    let startPage = lastKnownIdx + 1;             // the page that key leads to
+
+    if (dom.resultInfo) dom.resultInfo.textContent = `Loading page ${n}…`;
+
+    const limit = parseInt(dom.pageSize?.value) || 50;
+    const connection = getActiveTabConnection();
+    const endpoint = state.lastQueryEndpoint;
+    const baseParams = state.lastQueryParams ? { ...state.lastQueryParams } : {};
+    const isSql = endpoint === '/execute-statement';
+    const pageKey = isSql ? 'nextToken' : 'exclusiveStartKey';
+    const resultKey = isSql ? 'nextToken' : 'lastEvaluatedKey';
+
+    let curKey = pageKeyCache[lastKnownIdx];
+
+    for (let p = startPage; p <= n; p++) {
+        const params = { ...baseParams, limit };
+        if (curKey) params[pageKey] = curKey;
+
+        try {
+            const result = await api('POST', endpoint, params, { connection });
+            const nextKey = result[resultKey] || null;
+
+            // Cache this page's next key
+            if (nextKey && pageKeyCache[p] === undefined) {
+                pageKeyCache[p] = nextKey;
+            }
+
+            // If this is the target page, update state and render
+            if (p === n) {
+                currentPage = n;
+                state.items = result.items || [];
+                state.allColumns = [...new Set(state.items.flatMap(Object.keys))];
+                state.lastEvaluatedKey = nextKey;
+                document.dispatchEvent(new CustomEvent('renderDataRequest'));
+                renderPagination(!!nextKey);
+                if (dom.resultInfo) {
+                    dom.resultInfo.textContent = `Page ${currentPage} · ${state.items.length} items`;
+                }
+                return;
+            }
+
+            // Not target yet — cache the key and continue
+            curKey = nextKey;
+            if (!nextKey) {
+                // No more pages — target page doesn't exist
+                currentPage = p;
+                state.items = result.items || [];
+                state.allColumns = [...new Set(state.items.flatMap(Object.keys))];
+                state.lastEvaluatedKey = null;
+                document.dispatchEvent(new CustomEvent('renderDataRequest'));
+                renderPagination(false);
+                if (dom.resultInfo) {
+                    dom.resultInfo.textContent = `Page ${currentPage} · ${state.items.length} items (last page)`;
+                }
+                return;
+            }
+        } catch (err) {
+            showToast(`Failed to load page ${p}: ${err.message}`, 'error');
+            return;
+        }
+    }
 }
 
 function renderPagination(hasNextPage) {
     const knownPages = pageKeyCache.length; // pages we have keys for
-    const totalKnown = hasNextPage ? knownPages + 1 : knownPages;
 
     if (!dom.paginationControls) return;
 
-    if (totalKnown <= 1 && !hasNextPage) {
+    if (knownPages <= 1 && !hasNextPage) {
         dom.paginationControls.classList.add('hidden');
         return;
     }
     dom.paginationControls.classList.remove('hidden');
 
-    // First / Prev
+    // First / Prev / Next
     if (dom.pageFirstBtn) dom.pageFirstBtn.disabled = currentPage <= 1;
     if (dom.pagePrevBtn)  dom.pagePrevBtn.disabled  = currentPage <= 1;
     if (dom.pageNextBtn)  dom.pageNextBtn.disabled  = !hasNextPage;
 
-    // Page number buttons — show up to 7, with ellipsis
-    const lastKnown = hasNextPage ? knownPages : knownPages; // last page we know
-    const pages = buildPageRange(currentPage, lastKnown, hasNextPage);
+    // Show known pages + a few extra ahead when there are more pages
+    const extraAhead = hasNextPage ? 3 : 0;
+    const totalVisible = knownPages + extraAhead;
+    const pages = buildPageRange(currentPage, totalVisible);
 
     if (!dom.pageNumbers) return;
     dom.pageNumbers.innerHTML = pages.map(p => {
         if (p === '…') return `<span class="page-ellipsis">…</span>`;
         const isCurrent = p === currentPage;
-        const isDisabled = p > knownPages && hasNextPage && p !== currentPage + 1;
         return `<button class="page-num-btn${isCurrent ? ' active' : ''}"
-                    data-page="${p}"
-                    ${isDisabled ? 'disabled' : ''}
-                    >${p}</button>`;
+                    data-page="${p}">${p}</button>`;
     }).join('');
 
-    dom.pageNumbers.querySelectorAll('.page-num-btn:not(.active):not(:disabled)').forEach(btn => {
+    dom.pageNumbers.querySelectorAll('.page-num-btn:not(.active)').forEach(btn => {
         btn.addEventListener('click', () => goToPage(parseInt(btn.dataset.page)));
     });
 }
 
-function buildPageRange(current, lastKnown, hasMore) {
-    // Always show: 1, ..., current-1, current, current+1, ..., last
-    const total = hasMore ? lastKnown + 1 : lastKnown;
+function buildPageRange(current, total) {
     if (total <= 7) {
         return Array.from({ length: total }, (_, i) => i + 1);
     }
-    const pages = new Set([1, current - 1, current, current + 1, total].filter(p => p >= 1 && p <= total));
+    const pages = new Set([1, current - 1, current, current + 1, current + 2, total].filter(p => p >= 1 && p <= total));
     const sorted = [...pages].sort((a, b) => a - b);
     const result = [];
     for (let i = 0; i < sorted.length; i++) {
@@ -620,14 +770,37 @@ export async function executeQuery(append = false, forcedStartKey) {
             result = await api('POST', `/tables/${state.currentTable}/query`, params, { connection });
             if (!append) addToHistory('query', params);
         } else if (state.queryMode === 'sql') {
-            const statement = dom.sqlStatement.value.trim();
+            const statement = (sqlOverrideStatement || dom.sqlStatement.value).trim();
+            clearSqlError();
             if (!statement) {
                 showToast('SQL Statement is required', 'error');
-                dom.loadingState.classList.add('hidden');
-                dom.dataViewer.classList.remove('hidden');
+                restoreViewAfterAbort();
                 return;
             }
-            
+
+            const { kind, verb } = sqlStatementKind(statement);
+            if (kind === 'write') {
+                // INSERT / UPDATE / DELETE modify data: confirm, run, then refresh the grid
+                // by re-running the last SELECT of this tab (if any).
+                const ok = confirm(`${verb} modifies data in "${state.currentTable}".\n\nRun this statement?`);
+                if (!ok) { restoreViewAfterAbort(); return; }
+
+                const writeResult = await api('POST', `/execute-statement`, { statement }, { connection });
+                addToHistory('sql', { statement });
+                const { wcu, cost } = trackWrite(state.currentTable, writeResult.consumedCapacity, 'partiql', Date.now() - _t0, 1);
+                showToast(`${verb} executed${wcu > 0 ? ` · ${fmtCU(wcu)} WCU · ${fmtCost(cost)}` : ''}`, 'success');
+
+                if (state.activeTabId !== initiatingTabId) return;
+                if (lastSqlReadStatement) {
+                    sqlOverrideStatement = lastSqlReadStatement;
+                    try { await executeQuery(false); } finally { sqlOverrideStatement = null; }
+                } else {
+                    restoreViewAfterAbort();
+                    dom.resultInfo.textContent = `${verb} executed · run a SELECT to see the data`;
+                }
+                return;
+            }
+
             const params = { statement };
             // Save base params for full-table export (no pagination token)
             state.lastQueryEndpoint = `/execute-statement`;
@@ -640,6 +813,7 @@ export async function executeQuery(append = false, forcedStartKey) {
             if (!append) addToHistory('sql', params);
             // Only update pagination state if still on the same tab
             if (state.activeTabId === initiatingTabId) {
+                lastSqlReadStatement = statement;
                 state.nextToken = result.nextToken || null;
                 state.lastEvaluatedKey = state.nextToken; 
             }
@@ -743,6 +917,7 @@ export async function executeQuery(append = false, forcedStartKey) {
         if (state.activeTabId === initiatingTabId) {
             dom.loadingState.classList.add('hidden');
             dom.dataViewer.classList.remove('hidden');
+            if (state.queryMode === 'sql') showSqlError(err.message);
             showToast(`Query error: ${err.message}`, 'error');
         }
     }
@@ -772,6 +947,7 @@ export function loadQueryFromHistory(entry) {
 
     if (type === 'sql') {
         dom.sqlStatement.value = params.statement;
+        refreshSqlHighlight();
     } else if (type === 'query') {
         dom.queryPkValue.value = params.expressionAttributeValues[':pkval'];
         
@@ -827,7 +1003,11 @@ export function getQueryState() {
         scanExprNames: dom.scanExprNames.value,
         scanExprValues: dom.scanExprValues.value,
         sqlStatement: dom.sqlStatement.value,
-        queryMode: state.queryMode
+        lastSqlReadStatement,
+        queryMode: state.queryMode,
+        // Pagination state — saved per tab
+        currentPage,
+        pageKeyCache: [...pageKeyCache],
     };
 }
 
@@ -851,6 +1031,23 @@ export function setQueryState(q) {
     dom.scanExprValues.value = s.scanExprValues || '';
 
     dom.sqlStatement.value = s.sqlStatement || '';
+    lastSqlReadStatement = s.lastSqlReadStatement || '';
+    refreshSqlHighlight();
+
+    // Restore pagination state per tab
+    currentPage  = s.currentPage || 1;
+    pageKeyCache = Array.isArray(s.pageKeyCache) ? [...s.pageKeyCache] : [null];
+
+    // Re-render pagination UI
+    const hasNextPage = !!state.lastEvaluatedKey;
+    renderPagination(hasNextPage);
+
+    // Update result info
+    if (state.items?.length && dom.resultInfo) {
+        dom.resultInfo.textContent = `Page ${currentPage} · ${state.items.length} items`;
+    } else if (dom.resultInfo) {
+        dom.resultInfo.textContent = '';
+    }
 
     // Trigger updates
     dom.queryIndex.dispatchEvent(new Event('change'));

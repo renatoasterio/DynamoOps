@@ -1,12 +1,15 @@
 import { $ } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
 
-// ─── Pricing (on-demand, us-east-1 defaults) ─────────────────────────────────
-// Read pricing: $0.00013 per RCU
-// Write pricing: $0.00065 per WCU
+// ─── Pricing (on-demand, us-east-1, standard table class) ────────────────────
+// The tracker sums the ConsumedCapacity DynamoDB reports per request, so the
+// matching billing model is on-demand: $0.125 per million read request units
+// and $0.625 per million write request units. Provisioned tables are billed
+// per provisioned unit-hour instead, so for them the dollar figure is only a
+// relative indicator. Other regions and table classes differ slightly.
 const PRICING = {
-    RCU: 0.00013,   // $ per RCU
-    WCU: 0.00065,   // $ per WCU
+    RCU: 0.125 / 1_000_000,   // $ per read request unit
+    WCU: 0.625 / 1_000_000,   // $ per write request unit
 };
 
 // ─── Session state ────────────────────────────────────────────────────────────
@@ -173,6 +176,8 @@ function _bindUI() {
         session.alertFired = false;
         localStorage.setItem('costTracker', JSON.stringify({ alertThreshold: val }));
         showToast(`Cost alert set at ${fmtCost(val)}`, 'success');
+        _checkThreshold();
+        _refreshPanel();
     });
 
     $('#cost-threshold-clear')?.addEventListener('click', () => {

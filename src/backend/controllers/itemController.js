@@ -34,6 +34,27 @@ class ItemController {
         }
     }
 
+    async batchDelete(req, res) {
+        try {
+            const { keys } = req.body;
+            if (!Array.isArray(keys) || keys.length === 0) {
+                return res.status(400).json({ error: 'Keys array is required and must not be empty' });
+            }
+
+            const result = await dynamoService.batchDelete(req.clients, req.params.name, keys);
+
+            res.json({
+                success: true,
+                deletedCount: result.deletedCount,
+                unprocessedKeysCount: result.unprocessedKeys.length,
+                unprocessedKeys: result.unprocessedKeys.slice(0, 10),
+                consumedCapacity: result.consumedCapacity,
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
     async batchWrite(req, res) {
         try {
             const { items } = req.body;

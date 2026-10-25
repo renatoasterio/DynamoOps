@@ -32,7 +32,7 @@ const OBFUSCATE_OPTS = {
     deadCodeInjection: true,
     deadCodeInjectionThreshold: 0.2,
     debugProtection: false,
-    disableConsoleOutput: false,
+    disableConsoleOutput: true,
     identifierNamesGenerator: 'hexadecimal',
     renameGlobals: false,
     rotateStringArray: true,
@@ -95,7 +95,7 @@ fs.mkdirSync(STAGING, { recursive: true });
 
 // 2. Copy source files to staging
 console.log('2/5  Copying source files…');
-['server.js', 'electron-main.js', 'package.json'].forEach(f => {
+['server.js', 'electron-main.js', 'preload.js', 'package.json', '.env.production'].forEach(f => {
     const src = path.join(ROOT, f);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(STAGING, f));
 });
@@ -103,11 +103,18 @@ copyDir(path.join(ROOT, 'src'),    path.join(STAGING, 'src'));
 copyDir(path.join(ROOT, 'public'), path.join(STAGING, 'public'));
 copyDir(path.join(ROOT, 'assets'), path.join(STAGING, 'assets'));
 
-// node_modules symlink (avoids re-install)
+// Copy node_modules into staging. A symlink breaks electron-builder's
+// transitive-dependency walk — it only ends up packaging the direct deps,
+// leaving sub-packages like body-parser out of the asar (causes
+// "Cannot find module 'body-parser'" on startup). APFS copy-on-write
+// makes the real copy nearly free on macOS.
 const nmSrc = path.join(ROOT, 'node_modules');
 const nmDest = path.join(STAGING, 'node_modules');
-if (!fs.existsSync(nmDest) && fs.existsSync(nmSrc)) {
-    fs.symlinkSync(nmSrc, nmDest, 'junction');
+if (fs.existsSync(nmSrc)) {
+    // dereference:false keeps npm's internal .bin/ symlinks intact. Those
+    // point at sibling packages (.bin/electron-builder → ../electron-builder/...)
+    // and break if resolved to absolute paths in STAGING.
+    fs.cpSync(nmSrc, nmDest, { recursive: true });
 }
 
 // 3. Bundle frontend ES modules into a single file

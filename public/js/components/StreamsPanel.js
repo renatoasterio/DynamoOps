@@ -56,7 +56,10 @@ async function togglePanel() {
         }
 
         streamArn = status.streamArn;
-        dom.statusBadge.textContent = status.viewType || 'ENABLED';
+        // Short label keeps the toolbar on one row; the full view type is in the tooltip.
+        const SHORT = { KEYS_ONLY: 'KEYS', NEW_IMAGE: 'NEW', OLD_IMAGE: 'OLD', NEW_AND_OLD_IMAGES: 'NEW+OLD' };
+        dom.statusBadge.textContent = SHORT[status.viewType] || status.viewType || 'ENABLED';
+        dom.statusBadge.title = `Stream view type: ${status.viewType || 'ENABLED'}`;
         dom.statusBadge.classList.remove('hidden');
     } catch (err) {
         showToast(`Stream check failed: ${err.message}`, 'error');

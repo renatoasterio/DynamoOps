@@ -263,46 +263,6 @@ body {
 }
 
 
-/* Manage Profiles Modal */
-.profile-list-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    margin-bottom: 6px;
-    background: var(--bg-elevated);
-    font-size: 13px;
-}
-
-.profile-list-item .profile-name {
-    color: var(--text-primary);
-    font-weight: 500;
-}
-
-.profile-list-item .profile-detail {
-    color: var(--text-muted);
-    font-size: 11px;
-}
-
-.profile-list-item .profile-delete-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 14px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: all var(--transition-fast);
-}
-
-.profile-list-item .profile-delete-btn:hover {
-    color: var(--danger);
-    background: var(--danger-subtle);
-}
-
-
 #conn-status {
     font-size: 11px;
     font-weight: 600;
@@ -805,7 +765,7 @@ header .logo {
 
 header .logo strong {
     color: var(--primary);
-    background: var(--bg-gradient);
+    background: var(--accent-gradient);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1467,6 +1427,53 @@ header .logo strong {
     text-align: center;
 }
 
+/* ─── Multi-row selection ────────────────────────────────────────────────── */
+#data-table th.cell-select,
+#data-table td.cell-select {
+    width: 32px;
+    min-width: 32px;
+    padding: 8px 4px 8px 10px;
+    text-align: center;
+}
+
+#data-table .cell-select input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--accent);
+    vertical-align: middle;
+}
+
+#data-table tr.row-selected td {
+    background: var(--accent-subtle, rgba(99, 102, 241, 0.12));
+}
+
+.bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 8px;
+    margin-left: 2px;
+    border-left: 1px solid var(--border-default);
+}
+
+.bulk-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.bulk-count strong {
+    color: var(--text-primary);
+}
+
+.toolbar-icon-btn.bulk-delete-btn {
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
+.toolbar-icon-btn.bulk-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+}
+
 /* ─── Column resize handle ───────────────────────────────────────────────── */
 .col-resize-handle {
     position: absolute;
@@ -1558,6 +1565,12 @@ header .logo strong {
 
 #json-content {
     color: var(--text-primary);
+}
+
+.json-format-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
 }
 
 .json-record-compass {
@@ -1767,8 +1780,6 @@ header .logo strong {
 #delete-table-overlay,
 #truncate-table-overlay,
 #create-table-overlay,
-#assume-role-overlay,
-#manage-profiles-overlay,
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -1796,7 +1807,6 @@ header .logo strong {
 #create-table-modal,
 #delete-table-modal,
 #truncate-table-modal,
-#manage-profiles-modal,
 .modal-overlay > .modal {
     background: var(--bg-surface);
     border: 1px solid var(--border-default);
@@ -2024,166 +2034,6 @@ header .logo strong {
 
 .role-icon {
     font-size: 12px;
-}
-
-/* ─── Assume Role Modal ──────────────────────────────────────────── */
-#assume-role-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.2s ease;
-}
-
-#assume-role-modal {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    width: 540px;
-    max-width: 90vw;
-    max-height: 85vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.assume-role-header {
-    border-bottom: 1px solid rgba(245, 158, 11, 0.2) !important;
-}
-
-.assume-role-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.assume-role-icon {
-    font-size: 20px;
-}
-
-.assume-role-description {
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin-bottom: 16px;
-    line-height: 1.6;
-}
-
-.assume-role-description code {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: var(--accent-subtle);
-    color: var(--accent-hover);
-}
-
-.assume-role-form {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.form-group label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-
-.form-group label .required {
-    color: var(--danger);
-}
-
-.form-group input,
-.form-group select {
-    padding: 8px 12px;
-    font-size: 13px;
-}
-
-.form-row {
-    display: flex;
-    gap: 12px;
-}
-
-.form-row .form-group {
-    flex: 1;
-    min-width: 0;
-}
-
-.form-row .form-group input,
-.form-row .form-group select {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-}
-
-.assume-role-cmd-preview {
-    margin-top: 4px;
-    padding: 12px 14px;
-    border-radius: var(--radius-md);
-    background: var(--bg-base);
-    border: 1px solid var(--border-subtle);
-}
-
-.cmd-label {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-}
-
-.assume-role-cmd-preview code {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--success);
-    line-height: 1.6;
-    word-break: break-all;
-}
-
-.btn-assume-role-submit {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: linear-gradient(135deg, #f59e0b, #ef4444);
-    color: #fff;
-    font-weight: 600;
-    font-size: 12px;
-    border: none;
-    border-radius: var(--radius-sm);
-    padding: 8px 20px;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    white-space: nowrap;
-}
-
-.btn-assume-role-submit:hover {
-    filter: brightness(1.15);
-    transform: translateY(-1px);
-}
-
-.btn-assume-role-submit:active {
-    transform: translateY(0);
-}
-
-.btn-assume-role-submit:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none !important;
-    filter: none !important;
 }
 
 /* ─── Utility ────────────────────────────────────────────────────── */
@@ -2445,6 +2295,34 @@ header .logo strong {
 .saved-profile-item-login .profile-meta {
     font-size: 11px;
     color: var(--text-muted);
+}
+
+.saved-profile-item-login .profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.saved-profile-item-login .profile-delete-login {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 4px 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--transition-fast);
+}
+
+.saved-profile-item-login:hover .profile-delete-login {
+    opacity: 1;
+}
+
+.saved-profile-item-login .profile-delete-login:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: var(--danger-subtle);
 }
 
 .login-error-msg {
@@ -4613,3 +4491,728 @@ td.cell-editing {
 
 /* Session name — optional, visually de-emphasized */
 .ar-session-group label { opacity: 0.7; }
+
+/* ─── License Plan Badge ─────────────────────────────── */
+.plan-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.plan-badge:hover { opacity: 0.8; }
+.badge-plan-free    { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
+.badge-plan-pro     { background: rgba(99,102,241,0.2);  color: #a5b4fc; border: 1px solid rgba(99,102,241,0.4); }
+.badge-plan-proplus { background: rgba(168,85,247,0.2);  color: #d8b4fe; border: 1px solid rgba(168,85,247,0.4); }
+.badge-plan-team    { background: rgba(245,158,11,0.2);  color: #fcd34d; border: 1px solid rgba(245,158,11,0.4); }
+
+/* ─── License / Upgrade Modals ──────────────────────── */
+.upgrade-modal-box, .license-modal-box {
+    background: var(--surface, #1a1d2e);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 32px;
+    width: 440px;
+    max-width: 95vw;
+}
+.upgrade-modal-icon { font-size: 40px; text-align: center; margin-bottom: 12px; }
+.upgrade-modal-box h3, .license-modal-box h3 { margin: 0 0 8px; font-size: 18px; color: var(--text-primary, #e2e8f0); }
+.upgrade-modal-box p  { color: var(--text-secondary, #94a3b8); margin: 0 0 24px; line-height: 1.5; }
+.upgrade-modal-actions { display: flex; gap: 12px; justify-content: center; }
+
+.license-status-section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.license-current-plan { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.license-current-plan .label { font-size: 13px; color: var(--text-secondary, #94a3b8); }
+.license-email, .license-renews { font-size: 13px; color: var(--text-secondary, #94a3b8); margin-top: 4px; }
+.license-warning { font-size: 12px; color: #fcd34d; background: rgba(245,158,11,0.1); border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
+
+.license-hint { font-size: 13px; color: var(--text-secondary, #94a3b8); margin: 0 0 12px; }
+.license-input-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.license-key-input { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.license-get-key { font-size: 12px; color: var(--text-muted, #64748b); margin-top: 12px; }
+.license-get-key a { color: #818cf8; text-decoration: none; }
+.license-get-key a:hover { text-decoration: underline; }
+.license-error { font-size: 12px; color: #f87171; margin-top: 6px; padding: 6px 10px; background: rgba(248,113,113,0.1); border-radius: 6px; }
+
+.license-deactivate-section { text-align: center; }
+.btn-danger { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
+.btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+.license-success {
+    font-size: 12px;
+    color: #34d399;
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: rgba(52,211,153,0.1);
+    border-radius: 6px;
+}
+
+/* ─── Team management ───────────────────────────────── */
+.license-team-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.license-team-role { font-size: 13px; color: var(--text-secondary, #cbd5e1); }
+.btn-secondary {
+    background: rgba(99,102,241,0.15);
+    color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,0.3);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+.btn-secondary:hover { background: rgba(99,102,241,0.25); }
+
+.team-modal-box {
+    background: var(--surface, #1a1d2e);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 32px;
+    width: 560px;
+    max-width: 95vw;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+.team-loading { text-align: center; color: var(--text-muted, #94a3b8); padding: 20px; font-size: 13px; }
+.team-seats-row {
+    font-size: 13px;
+    color: var(--text-secondary, #cbd5e1);
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    background: rgba(99,102,241,0.08);
+    border-radius: 8px;
+}
+.team-members-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.team-member-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+}
+.team-member-info { flex: 1; min-width: 0; }
+.team-member-email { font-size: 13px; color: var(--text-primary, #e2e8f0); font-weight: 500; }
+.team-member-meta { display: flex; gap: 6px; margin-top: 4px; }
+.team-member-key {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted, #94a3b8);
+    margin-top: 4px;
+    padding: 3px 6px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 4px;
+    display: inline-block;
+    cursor: text;
+    user-select: all;
+}
+.team-role-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+.team-role-owner { background: rgba(245,158,11,0.2); color: #fcd34d; }
+.team-role-member { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+.team-status-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+.team-status-active { background: rgba(52,211,153,0.15); color: #34d399; }
+.team-status-pending { background: rgba(148,163,184,0.15); color: #94a3b8; }
+.team-remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #94a3b8);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+.team-remove-btn:hover { background: rgba(239,68,68,0.15); color: #f87171; }
+
+.team-invite-section {
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.team-invite-section h4 { margin: 0 0 10px; font-size: 13px; color: var(--text-primary, #e2e8f0); }
+.team-invite-row { display: flex; gap: 8px; }
+.team-invite-input {
+    flex: 1;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-primary, #e2e8f0);
+    border-radius: 6px;
+    font-size: 13px;
+}
+.team-invite-input:focus { outline: none; border-color: rgba(99,102,241,0.5); }
+.team-member-hint {
+    padding: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted, #94a3b8);
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+}
+
+/* ── Machine transfer flow ─────────────────────────────────────────── */
+.license-transfer-section {
+    padding: 24px 8px 8px;
+    text-align: center;
+}
+.license-transfer-code-input {
+    width: 240px;
+    margin: 16px auto 12px;
+    display: block;
+    padding: 12px 16px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 28px;
+    letter-spacing: 8px;
+    text-align: center;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text-primary, #e2e8f0);
+    border-radius: 8px;
+}
+.license-transfer-code-input:focus {
+    outline: none;
+    border-color: rgba(99,102,241,0.6);
+}
+.license-transfer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    margin-top: 8px;
+}
+.license-transfer-resend-link {
+    color: var(--accent, #818cf8);
+    font-size: 12px;
+    text-decoration: none;
+}
+.license-transfer-resend-link:hover { text-decoration: underline; }
+
+/* ── Activation history ─────────────────────────────────────────────── */
+.license-history-section {
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 12px;
+}
+.license-history-modal-box {
+    max-width: 560px;
+    width: 90%;
+}
+.activation-history-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted, #94a3b8);
+    margin-bottom: 8px;
+}
+.activation-history-current {
+    margin-bottom: 16px;
+}
+.activation-history-row {
+    display: grid;
+    grid-template-columns: 120px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+.activation-history-id {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    color: var(--text-muted, #94a3b8);
+}
+.activation-history-dates {
+    color: var(--text-primary, #e2e8f0);
+    font-size: 12px;
+    line-height: 1.5;
+}
+.activation-history-source-badge {
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.activation-history-source-initial {
+    background: rgba(34,197,94,0.15);
+    color: #4ade80;
+}
+.activation-history-source-transfer {
+    background: rgba(99,102,241,0.15);
+    color: #a5b4fc;
+}
+.activation-history-source-auto-revoke {
+    background: rgba(251,191,36,0.15);
+    color: #fbbf24;
+}
+.activation-history-source-deactivate-reactivate {
+    background: rgba(148,163,184,0.15);
+    color: #cbd5e1;
+}
+
+/* ─── License entry points (header / login) ─────────── */
+.license-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent-gradient);
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 6px 16px -8px var(--accent);
+    transition: filter var(--transition-fast), transform var(--transition-fast);
+}
+.license-cta-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.license-cta-btn:active { transform: translateY(0); }
+.license-cta-btn .license-cta-key { font-size: 13px; line-height: 1; }
+.license-cta-btn .plan-badge {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    border: none;
+    padding: 1px 6px;
+    font-size: 9px;
+    cursor: inherit;
+}
+.plan-badge.plan-badge-paid { padding: 4px 10px; font-size: 11px; gap: 5px; }
+
+.login-license-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+.login-license-bar.hidden { display: none; }
+.login-license-status { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.login-license-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.login-license-link {
+    background: none;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    color: #a5b4fc;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+.login-license-link:hover { background: var(--accent-subtle); border-color: var(--accent); color: #fff; }
+.login-license-link.primary { background: var(--accent-gradient); border: none; color: #fff; box-shadow: 0 6px 16px -8px var(--accent); }
+.login-license-link.primary:hover { filter: brightness(1.12); }
+
+/* ─── License modal (activation) ────────────────────── */
+.license-modal-box { width: 460px; padding: 26px 28px 22px; }
+.license-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.license-modal-title { display: flex; align-items: center; gap: 12px; }
+.license-modal-title h3 { margin: 0; font-size: 18px; }
+.license-modal-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-subtle);
+    color: var(--accent-hover);
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.license-modal-sub { color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin: 0 0 18px; }
+.license-field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.license-key-input {
+    width: 100%;
+    padding: 11px 12px;
+    border-radius: 10px;
+    background: var(--bg-base);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.license-key-input::placeholder { color: var(--text-muted); letter-spacing: 0.04em; }
+.license-key-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
+.license-key-input.invalid { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-subtle); }
+.license-key-input:disabled { opacity: 0.6; }
+.license-input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.license-paste-btn { padding: 0 14px; font-size: 12px; white-space: nowrap; }
+.license-activate-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    border-radius: 10px;
+}
+.license-error { margin-top: 10px; }
+.license-hint-muted { font-size: 12px; color: var(--text-muted); margin: 12px 0 0; line-height: 1.5; }
+.license-hint-muted code { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary); }
+.license-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.license-modal-footer-plan { display: inline-flex; align-items: center; gap: 8px; }
+.license-modal-link { color: #818cf8; text-decoration: none; font-weight: 500; }
+.license-modal-link:hover { text-decoration: underline; }
+.license-shortcut-hint { font-size: 11px; color: var(--text-muted); margin: 14px 0 0; text-align: center; }
+.license-kbd {
+    font-family: inherit;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+}
+.license-success-state { text-align: center; padding: 10px 0 2px; }
+.license-success-state h3 { margin: 0 0 6px; font-size: 18px; }
+.license-success-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    margin: 0 auto 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--success-subtle);
+    color: var(--success);
+    font-size: 26px;
+    font-weight: 700;
+}
+.upgrade-modal-cancel {
+    display: block;
+    margin: 14px auto 0;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+.upgrade-modal-cancel:hover { color: var(--text-secondary); text-decoration: underline; }
+
+.license-modal-box .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 22px;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+.license-modal-box .modal-close:hover { background: rgba(255, 255, 255, 0.06); color: var(--text-primary); }
+
+/* License / upgrade modals must sit above the login screen too (reachable before connecting) */
+#license-modal, #upgrade-modal, #license-history-modal, #team-modal { z-index: 5000; }
+
+/* Paid-state license modal: avoid stacked separators */
+.license-modal-box .license-status-section { margin-bottom: 8px; padding-bottom: 14px; }
+.license-modal-box .license-team-section { border-bottom: none; margin-bottom: 0; padding: 8px 0; }
+.license-modal-box .license-history-section { border-top: none; margin-top: 0; padding: 4px 0 14px; }
+.license-modal-box .license-deactivate-section { padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+
+/* ─── Toolbar: one row, always ─────────────────────────
+   Before, the toolbar wrapped as soon as the Pro/Pro+ buttons were visible
+   (left 498px + right 667px > 1140px available at a 1400px window), pushing
+   "Filters" and "Execute" to a second line. Now the search box shrinks and
+   secondary buttons collapse to icons (tooltips keep their names). */
+#toolbar {
+    flex-wrap: nowrap;
+    container-type: inline-size;
+    min-width: 0;
+}
+.toolbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.toolbar-left .search-container-premium {
+    width: auto;
+    flex: 1 1 160px;
+    min-width: 110px;
+    max-width: 250px;
+}
+.toolbar-left .search-container-premium input { min-width: 0; width: 100%; }
+.toolbar-right { flex: 0 0 auto; }
+@container (max-width: 1090px) {
+    .toolbar-right .toolbar-icon-btn .btn-label { display: none; }
+    .toolbar-right .toolbar-icon-btn { padding: 5px 8px; }
+}
+@container (max-width: 900px) {
+    .toolbar-left .btn-label { display: none; }
+    #add-item-btn { padding-left: 10px; padding-right: 10px; }
+}
+#filter-toggle-btn.active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent-hover);
+}
+
+/* ─── SQL (PartiQL) editor ───────────────────────────── */
+:root {
+    --sql-kw: #c4b5fd;
+    --sql-fn: #7dd3fc;
+    --sql-string: #86efac;
+    --sql-number: #fcd34d;
+    --sql-ident: #e8eaf0;
+    --sql-comment: #5c6175;
+    --sql-op: #f9a8d4;
+}
+[data-theme="light"] {
+    --sql-kw: #6d28d9;
+    --sql-fn: #0369a1;
+    --sql-string: #047857;
+    --sql-number: #b45309;
+    --sql-ident: #1a1c24;
+    --sql-comment: #8b8fa4;
+    --sql-op: #be185d;
+}
+
+.sql-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+.sql-toolbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sql-toolbar-left label { margin: 0; }
+.sql-toolbar-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.sql-kind-pill {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+.sql-kind-read  { background: var(--success-subtle); color: var(--success); border: 1px solid rgba(52, 211, 153, 0.3); }
+.sql-kind-write { background: rgba(245, 158, 11, 0.14); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.4); }
+.sql-tool-btn {
+    background: none;
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    padding: 4px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11.5px;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+.sql-tool-btn:hover, .sql-tool-btn.active { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-strong); }
+.sql-tool-link { font-size: 11.5px; color: var(--text-muted); text-decoration: none; padding: 4px 4px; }
+.sql-tool-link:hover { color: var(--accent-hover); }
+.sql-templates-wrap { position: relative; }
+.sql-templates-menu {
+    right: 0;
+    left: auto;
+    width: 360px;
+    max-height: 340px;
+}
+.sql-tpl-group {
+    padding: 6px 12px 2px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.sql-tpl-item { padding: 6px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.sql-tpl-item:hover { background: var(--bg-hover); }
+.sql-tpl-label { font-size: 12.5px; color: var(--text-primary); }
+.sql-tpl-preview {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sql-tpl-write .sql-tpl-label::after { content: ' · writes data'; color: var(--warning); font-size: 10px; }
+
+/* Overlay highlighting: the <pre> renders the colored tokens, the textarea on
+   top is transparent (only the caret and selection are visible). Both must
+   share the exact same box metrics. */
+.sql-editor-container {
+    position: relative;
+    width: 100%;
+    background: var(--bg-base);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.sql-editor-container:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle); }
+.sql-highlight,
+#sql-statement {
+    margin: 0;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    letter-spacing: normal;
+    tab-size: 2;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+    width: 100%;
+    border: 0;
+    border-radius: var(--radius-sm);
+}
+.sql-highlight {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    color: var(--sql-ident);
+    background: transparent;
+}
+.sql-highlight code { font: inherit; white-space: inherit; }
+#sql-statement {
+    position: relative;
+    display: block;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--text-primary);
+    min-height: 96px;
+    max-height: 320px;
+    overflow-y: auto;
+    resize: none;
+    outline: none;
+    box-shadow: none;
+}
+#sql-statement::placeholder { color: var(--text-muted); }
+#sql-statement::selection { background: rgba(99, 102, 241, 0.35); color: transparent; }
+#sql-statement:focus { border: 0; box-shadow: none; outline: none; }
+.sql-tk-kw      { color: var(--sql-kw); font-weight: 600; }
+.sql-tk-fn      { color: var(--sql-fn); }
+.sql-tk-string  { color: var(--sql-string); }
+.sql-tk-number  { color: var(--sql-number); }
+.sql-tk-ident   { color: var(--sql-ident); }
+.sql-tk-comment { color: var(--sql-comment); font-style: italic; }
+.sql-tk-op      { color: var(--sql-op); }
+
+.sql-error {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--danger-subtle);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger-hover);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+.sql-hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.sql-hint kbd {
+    font-family: inherit;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+}
+.sql-hint code { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--text-secondary); }
+
+/* ─── AWS SSO sign-in (login screen) ─────────────────── */
+.sso-intro { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 14px; }
+.sso-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 14px; }
+.sso-chips-label { font-size: 11px; color: var(--text-muted); margin-right: 2px; }
+.sso-chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-default);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.sso-chip:hover, .sso-chip.active { border-color: var(--accent); color: var(--text-primary); background: var(--accent-subtle); }
+.sso-wait { text-align: center; padding: 18px 8px 6px; }
+.sso-wait .spinner { margin: 0 auto 14px; }
+.sso-wait-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.sso-wait-text { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin: 0 auto 14px; max-width: 360px; }
+.sso-code { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.sso-code strong {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: var(--accent-subtle);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: var(--accent-hover);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    letter-spacing: 0.12em;
+}
+.sso-links { display: flex; justify-content: center; gap: 10px; font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+.sso-links a { color: #818cf8; text-decoration: none; }
+.sso-links a:hover { text-decoration: underline; }
+.sso-pick-info { font-size: 12px; color: var(--success); margin-bottom: 12px; }
+.sso-pick-info::before { content: '✓ '; }

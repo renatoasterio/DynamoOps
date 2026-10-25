@@ -342,6 +342,38 @@ class DynamoService {
         return { processedCount, unprocessedItems, consumedCapacity: { CapacityUnits: totalConsumedWCU } };
     }
 
+    async batchDelete(clients, tableName, keys) {
+        const chunkSize = 25;
+        const maxRetries = 3;
+        let deletedCount = 0;
+        let unprocessedKeys = [];
+        let totalConsumedWCU = 0;
+
+        for (let i = 0; i < keys.length; i += chunkSize) {
+            let requestItems = keys.slice(i, i + chunkSize).map(key => ({
+                DeleteRequest: { Key: key }
+            }));
+
+            // Retry unprocessed requests with exponential backoff (throttling)
+            for (let attempt = 0; requestItems.length && attempt <= maxRetries; attempt++) {
+                if (attempt > 0) await new Promise(r => setTimeout(r, 100 * 2 ** attempt));
+                const result = await clients.docClient.send(new BatchWriteCommand({
+                    RequestItems: { [tableName]: requestItems },
+                    ReturnConsumedCapacity: 'TOTAL',
+                }));
+                if (result.ConsumedCapacity) {
+                    totalConsumedWCU += result.ConsumedCapacity.reduce((s, c) => s + (c.CapacityUnits || 0), 0);
+                }
+                const unprocessed = result.UnprocessedItems?.[tableName] || [];
+                deletedCount += requestItems.length - unprocessed.length;
+                requestItems = unprocessed;
+            }
+            unprocessedKeys = unprocessedKeys.concat(requestItems.map(r => r.DeleteRequest.Key));
+        }
+
+        return { deletedCount, unprocessedKeys, consumedCapacity: { CapacityUnits: totalConsumedWCU } };
+    }
+
     async truncateTable(clients, tableName) {
         const tableDescription = await clients.dynamoClient.send(new DescribeTableCommand({ TableName: tableName }));
         const keySchema = tableDescription.Table.KeySchema;

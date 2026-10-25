@@ -135,7 +135,7 @@ function renderTimeline() {
     const items       = state.items || [];
 
     if (!field || !items.length) {
-        container.innerHTML = '<div class="chart-empty">Nenhum dado disponível. Execute uma query primeiro.</div>';
+        container.innerHTML = '<div class="chart-empty">No data available. Run a query first.</div>';
         return;
     }
 
@@ -155,13 +155,13 @@ function renderTimeline() {
 
     const entries = Object.entries(buckets).sort(([a], [b]) => a.localeCompare(b));
     if (!entries.length) {
-        container.innerHTML = '<div class="chart-empty">Nenhum item com valor válido no campo selecionado.</div>';
+        container.innerHTML = '<div class="chart-empty">No items with a valid value in the selected field.</div>';
         return;
     }
 
     const cw = container.clientWidth - 40; // subtract padding
     container.innerHTML = `
-      <div class="chart-title">Items por ${granularity} · campo: <strong>${field}</strong></div>
+      <div class="chart-title">Items per ${granularity} · field: <strong>${field}</strong></div>
       ${barChart(entries, { color: '#6366f1', unit: 'items', containerWidth: cw })}
     `;
 }
@@ -176,13 +176,13 @@ function renderDistribution() {
     const items = state.items || [];
 
     if (!field || !items.length) {
-        container.innerHTML = '<div class="chart-empty">Nenhum dado disponível.</div>';
+        container.innerHTML = '<div class="chart-empty">No data available.</div>';
         return;
     }
 
     const values = items.map(i => Number(i[field])).filter(v => !isNaN(v));
     if (!values.length) {
-        container.innerHTML = '<div class="chart-empty">Nenhum item com valor numérico no campo selecionado.</div>';
+        container.innerHTML = '<div class="chart-empty">No items with a numeric value in the selected field.</div>';
         return;
     }
 
@@ -208,7 +208,7 @@ function renderDistribution() {
 
     const cw = container.clientWidth - 40;
     container.innerHTML = `
-      <div class="chart-title">Distribuição de <strong>${field}</strong></div>
+      <div class="chart-title">Distribution of <strong>${field}</strong></div>
       ${stats}
       ${barChart(buckets, { color: '#a78bfa', unit: 'items', rotateLabels: true, containerWidth: cw })}
     `;
@@ -222,7 +222,7 @@ function renderHeatmap() {
 
     const items = state.items || [];
     if (!items.length) {
-        container.innerHTML = '<div class="chart-empty">Nenhum dado disponível. Execute uma query primeiro.</div>';
+        container.innerHTML = '<div class="chart-empty">No data available. Run a query first.</div>';
         return;
     }
 
@@ -230,7 +230,7 @@ function renderHeatmap() {
     const pkAttr = state.tableInfo?.KeySchema?.find(k => k.KeyType === 'HASH');
     const pkName = pkAttr?.AttributeName;
     if (!pkName) {
-        container.innerHTML = '<div class="chart-empty">Partition key não identificada.</div>';
+        container.innerHTML = '<div class="chart-empty">Partition key not identified.</div>';
         return;
     }
 
@@ -247,7 +247,7 @@ function renderHeatmap() {
     const maxVal     = topN[0]?.[1] || 1;
     const hot        = topN.filter(([,c]) => c / totalItems > 0.2).length;
 
-    const hotWarning = hot > 0 ? `<div class="heatmap-warning">⚠️ ${hot} partition key${hot > 1 ? 's' : ''} com >20% dos items — possível hot partition</div>` : '';
+    const hotWarning = hot > 0 ? `<div class="heatmap-warning">⚠️ ${hot} partition key${hot > 1 ? 's' : ''} with >20% of items — possible hot partition</div>` : '';
 
     const cells = topN.map(([key, count]) => {
         const ratio     = count / maxVal;
@@ -265,10 +265,10 @@ function renderHeatmap() {
     }).join('');
 
     container.innerHTML = `
-      <div class="chart-title">Partition Heatmap · <strong>${pkName}</strong> · ${entries.length} valores únicos · ${totalItems} items carregados</div>
+      <div class="chart-title">Partition Heatmap · <strong>${pkName}</strong> · ${entries.length} unique values · ${totalItems} items loaded</div>
       ${hotWarning}
       <div class="heatmap-grid">${cells}</div>
-      ${entries.length > 50 ? `<div class="chart-sub">Mostrando top 50 de ${entries.length} valores únicos</div>` : ''}
+      ${entries.length > 50 ? `<div class="chart-sub">Showing top 50 of ${entries.length} unique values</div>` : ''}
     `;
 }
 
