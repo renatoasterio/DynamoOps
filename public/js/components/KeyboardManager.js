@@ -22,14 +22,6 @@ function handleKeydown(e) {
     const mod = e.metaKey || e.ctrlKey;
     if (!mod) return;
 
-    // Cmd/Ctrl+Shift+L — License window. Works everywhere (login screen too),
-    // even with focus inside an input.
-    if (e.shiftKey && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        window.licenseManager?.showLicenseModal();
-        return;
-    }
-
     const tag = document.activeElement?.tagName;
     // Allow Cmd+Enter inside textareas (SQL editor), block other shortcuts in inputs
     const isInput = (tag === 'INPUT' || tag === 'SELECT') ||

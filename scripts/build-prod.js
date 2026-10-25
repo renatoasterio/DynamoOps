@@ -2,9 +2,8 @@
 /**
  * Production build script:
  *   1. Bundles the frontend (ES modules → single bundle.js) via esbuild
- *   2. Obfuscates all JS (frontend bundle + backend) via javascript-obfuscator
- *   3. Runs electron-builder from the staging directory
- *   4. Moves dist to project root and cleans up
+ *   2. Runs electron-builder from the staging directory
+ *   3. Moves dist to project root and cleans up
  *
  * Source files are NEVER modified.
  *
@@ -18,38 +17,10 @@ const fs            = require('fs');
 const path          = require('path');
 const { execSync }  = require('child_process');
 const esbuild       = require('esbuild');
-const JavaScriptObfuscator = require('javascript-obfuscator');
 
 const ROOT    = path.resolve(__dirname, '..');
 const STAGING = path.join(ROOT, '.build-staging');
 const ARGS    = process.argv.slice(2).join(' ');
-
-// ── Obfuscator options ────────────────────────────────────────────────────────
-const OBFUSCATE_OPTS = {
-    compact: true,
-    controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 0.4,
-    deadCodeInjection: true,
-    deadCodeInjectionThreshold: 0.2,
-    debugProtection: false,
-    disableConsoleOutput: true,
-    identifierNamesGenerator: 'hexadecimal',
-    renameGlobals: false,
-    rotateStringArray: true,
-    selfDefending: false,
-    shuffleStringArray: true,
-    splitStrings: true,
-    splitStringsChunkLength: 8,
-    stringArray: true,
-    stringArrayCallsTransform: true,
-    stringArrayEncoding: ['base64'],
-    stringArrayIndexShift: true,
-    stringArrayRotate: true,
-    stringArrayShuffle: true,
-    stringArrayWrappersCount: 2,
-    stringArrayWrappersType: 'function',
-    unicodeEscapeSequence: false,
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function copyDir(src, dest) {
@@ -62,25 +33,6 @@ function copyDir(src, dest) {
     }
 }
 
-function obfuscateFile(filePath, target = 'node') {
-    const src = fs.readFileSync(filePath, 'utf8');
-    try {
-        const result = JavaScriptObfuscator.obfuscate(src, { ...OBFUSCATE_OPTS, target });
-        fs.writeFileSync(filePath, result.getObfuscatedCode(), 'utf8');
-        console.log(`  ✔  ${path.relative(STAGING, filePath)}`);
-    } catch (err) {
-        console.warn(`  ✗  ${path.relative(STAGING, filePath)} — skipped (${err.message})`);
-    }
-}
-
-function walkAndObfuscate(dir, target = 'node') {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) walkAndObfuscate(full, target);
-        else if (entry.name.endsWith('.js')) obfuscateFile(full, target);
-    }
-}
-
 function rmDir(dir) {
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 }
@@ -89,13 +41,13 @@ function rmDir(dir) {
 console.log('\n📦  DynamoOps — Production Build\n');
 
 // 1. Clean & create staging
-console.log('1/5  Creating staging directory…');
+console.log('1/4  Creating staging directory…');
 rmDir(STAGING);
 fs.mkdirSync(STAGING, { recursive: true });
 
 // 2. Copy source files to staging
-console.log('2/5  Copying source files…');
-['server.js', 'electron-main.js', 'preload.js', 'package.json', '.env.production'].forEach(f => {
+console.log('2/4  Copying source files…');
+['server.js', 'electron-main.js', 'package.json'].forEach(f => {
     const src = path.join(ROOT, f);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(STAGING, f));
 });
@@ -118,7 +70,7 @@ if (fs.existsSync(nmSrc)) {
 }
 
 // 3. Bundle frontend ES modules into a single file
-console.log('\n3/5  Bundling frontend JS…');
+console.log('\n3/4  Bundling frontend JS…');
 const publicJsDir   = path.join(STAGING, 'public', 'js');
 const bundleOutFile = path.join(publicJsDir, 'bundle.js');
 
@@ -128,7 +80,7 @@ esbuild.buildSync({
     outfile: bundleOutFile,
     format: 'iife',           // single self-executing bundle, no import/export
     platform: 'browser',
-    minify: true,             // minify before obfuscation
+    minify: true,
     treeShaking: true,
     target: ['chrome108'],    // Electron 28+ uses Chrome 120, so this is safe
     logLevel: 'silent',
@@ -153,17 +105,8 @@ indexHtml = indexHtml.replace(
 fs.writeFileSync(indexPath, indexHtml, 'utf8');
 console.log('  ✔  index.html updated to use bundle.js');
 
-// 4. Obfuscate JS
-console.log('\n4/5  Obfuscating JavaScript…\n');
-// Backend (Node.js target)
-obfuscateFile(path.join(STAGING, 'server.js'), 'node');
-obfuscateFile(path.join(STAGING, 'electron-main.js'), 'node');
-walkAndObfuscate(path.join(STAGING, 'src'), 'node');
-// Frontend bundle (browser target, no eval)
-obfuscateFile(bundleOutFile, 'browser-no-eval');
-
-// 5. Run electron-builder from staging
-console.log(`\n5/5  Running electron-builder ${ARGS}…\n`);
+// 4. Run electron-builder from staging
+console.log(`\n4/4  Running electron-builder ${ARGS}…\n`);
 execSync(
     `npx electron-builder ${ARGS} --project "${STAGING}" --publish never`,
     { stdio: 'inherit', cwd: STAGING }

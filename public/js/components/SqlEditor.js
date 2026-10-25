@@ -178,7 +178,7 @@ function updateKindPill() {
     pill.className = `sql-kind-pill sql-kind-${kind}`;
     pill.textContent = kind === 'write' ? `${verb} · writes data` : `${verb} · read`;
     pill.title = kind === 'write'
-        ? 'This statement modifies the table (Pro plan). You will be asked to confirm before it runs.'
+        ? 'This statement modifies the table. You will be asked to confirm before it runs.'
         : 'Read-only statement';
 }
 

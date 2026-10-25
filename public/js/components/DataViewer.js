@@ -230,8 +230,6 @@ function renderTableInfo(table) {
     });
 
     const gsis = table.GlobalSecondaryIndexes || [];
-    // Index management is a Pro+ feature; without a license manager (no-license build) everything is allowed.
-    const canManageIndexes = window.licenseManager?.hasPlan?.('pro_plus') ?? true;
     gsis.forEach((gsi) => {
         const gsiPk = gsi.KeySchema?.find(k => k.KeyType === 'HASH')?.AttributeName || '';
         const gsiSk = gsi.KeySchema?.find(k => k.KeyType === 'RANGE')?.AttributeName;
@@ -242,7 +240,7 @@ function renderTableInfo(table) {
             <span class="key-type">GSI</span>${gsi.IndexName}
             <span class="gsi-keys">${keyInfo}</span>
             ${status !== 'ACTIVE' ? `<span class="gsi-status">${status}</span>` : ''}
-            ${canManageIndexes ? `<button class="gsi-delete-btn" data-gsi="${gsi.IndexName}" title="Delete GSI">✕</button>` : ''}
+            <button class="gsi-delete-btn" data-gsi="${gsi.IndexName}" title="Delete GSI">✕</button>
         </span>`);
     });
 
