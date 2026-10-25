@@ -34,6 +34,8 @@ To try things without an AWS account, run LocalStack or DynamoDB Local and conne
 
 ## Pull requests
 
+`main` is protected: nobody pushes to it directly, and every change is merged through a pull request that the maintainer has reviewed and approved.
+
 1. Fork the repository and create a branch from `main`.
 2. Keep each pull request focused on one change.
 3. Run the checks; both must pass:

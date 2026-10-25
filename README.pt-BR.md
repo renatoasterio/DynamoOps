@@ -157,14 +157,22 @@ npm run build:prod:win            # Windows x64 (instalador + portátil)
 
 ### Releases
 
-As releases são geradas pelo [`.github/workflows/release.yml`](.github/workflows/release.yml). Suba a versão e envie uma tag:
+As releases são geradas pelo [`.github/workflows/release.yml`](.github/workflows/release.yml). A `main` é protegida, então a mudança de versão entra por pull request e a tag é enviada depois do merge:
 
 ```bash
-npm version 3.0.1
-git push --follow-tags
+# 1. Suba a versão num pull request
+git switch -c release/3.0.1
+npm version 3.0.1 --no-git-tag-version
+git commit -am "chore(release): 3.0.1"
+git push -u origin release/3.0.1      # abra o PR, revise e faça o merge
+
+# 2. Crie a tag no commit mergeado na main
+git switch main && git pull
+git tag v3.0.1
+git push origin v3.0.1
 ```
 
-O workflow roda testes e lint, gera os DMGs de macOS e o instalador e a versão portátil de Windows, e publica tudo com checksums numa release do GitHub.
+Enviar a tag dispara o workflow. Ele roda testes e lint, gera os DMGs de macOS e o instalador e a versão portátil de Windows, e publica tudo com checksums numa release do GitHub.
 
 ## Arquitetura
 

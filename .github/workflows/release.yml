@@ -1,7 +1,8 @@
 # Builds the desktop installers on native runners and publishes them as a
-# GitHub release. Push a version tag to cut a release:
+# GitHub release. main is protected (changes only through reviewed PRs), so:
 #
-#   npm version 3.0.1 && git push --follow-tags
+#   1. bump the version in a PR:  npm version 3.0.1 --no-git-tag-version
+#   2. after merging, tag main:   git tag v3.0.1 && git push origin v3.0.1
 #
 # Builds are not signed or notarized (no Apple / Windows certificates), so
 # macOS Gatekeeper and Windows SmartScreen warn on first launch.

@@ -157,14 +157,22 @@ npm run build:prod:win            # Windows x64 (installer + portable)
 
 ### Releases
 
-Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml). Bump the version and push a tag:
+Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml). `main` is protected, so the version bump goes through a pull request and the tag is pushed after the merge:
 
 ```bash
-npm version 3.0.1
-git push --follow-tags
+# 1. Bump the version in a pull request
+git switch -c release/3.0.1
+npm version 3.0.1 --no-git-tag-version
+git commit -am "chore(release): 3.0.1"
+git push -u origin release/3.0.1      # open the PR, review and merge it
+
+# 2. Tag the merged commit on main
+git switch main && git pull
+git tag v3.0.1
+git push origin v3.0.1
 ```
 
-The workflow runs tests and lint, builds the macOS DMGs and the Windows installer and portable exe, and publishes them with checksums as a GitHub release.
+Pushing the tag starts the workflow. It runs tests and lint, builds the macOS DMGs and the Windows installer and portable exe, and publishes them with checksums as a GitHub release.
 
 ## Architecture
 
