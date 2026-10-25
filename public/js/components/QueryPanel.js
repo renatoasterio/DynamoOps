@@ -222,6 +222,68 @@ function initSqlAutocomplete() {
 
     let activeSuggestions = [];
     let selectedIdx = -1;
+    let columnInfo = null; // attributes of the statement's target table (set per input)
+
+    // ── Column catalog of the table referenced by FROM / UPDATE / INTO ──
+    // Cached per connection + table: { columns, keyNames, typeMap } once loaded,
+    // a Promise while describe + sample scan are in flight.
+    const columnCache = new Map();
+
+    function targetTable(sql) {
+        const m = sql.match(/\b(?:FROM|UPDATE|INTO)\s+"([^"]+)"/i)
+               || sql.match(/\b(?:FROM|UPDATE|INTO)\s+([\w.-]+)/i);
+        return m ? m[1].split('.')[0] : state.currentTable;
+    }
+
+    function buildColumnInfo(tableInfo, attrNames) {
+        const keyNames = new Set((tableInfo?.KeySchema || []).map(k => k.AttributeName));
+        const typeMap  = Object.fromEntries((tableInfo?.AttributeDefinitions || []).map(a => [a.AttributeName, a.AttributeType]));
+        const columns  = [...new Set([...keyNames, ...Object.keys(typeMap), ...attrNames])];
+        return { columns, keyNames, typeMap };
+    }
+
+    function getColumnInfo(table) {
+        if (!table) return null;
+        const connection = getActiveTabConnection();
+        const cacheKey = `${JSON.stringify(connection || {})}|${table}`;
+        const cached = columnCache.get(cacheKey);
+        const loaded = cached && !(cached instanceof Promise) ? cached : null;
+
+        // Current table: data already on screen is the freshest source
+        if (table === state.currentTable && state.tableInfo) {
+            const keyCount = (state.tableInfo.KeySchema || []).length;
+            if (state.allColumns.length > keyCount || loaded) {
+                return buildColumnInfo(state.tableInfo, [...state.allColumns, ...(loaded?.columns || [])]);
+            }
+        } else if (loaded) {
+            return loaded;
+        }
+
+        if (!cached) {
+            const load = Promise.all([
+                api('GET', `/tables/${encodeURIComponent(table)}`, null, { connection }),
+                api('POST', `/tables/${encodeURIComponent(table)}/scan`, { limit: 50 }, { connection }),
+            ]).then(([desc, sample]) => {
+                const attrs = (sample.items || []).flatMap(Object.keys);
+                columnCache.set(cacheKey, buildColumnInfo(desc.table, attrs));
+                if (document.activeElement === dom.sqlStatement) handleInput();
+            }).catch(() => columnCache.delete(cacheKey));
+            columnCache.set(cacheKey, load);
+        }
+        // While loading, fall back to whatever is known about the current table
+        return table === state.currentTable && state.tableInfo
+            ? buildColumnInfo(state.tableInfo, state.allColumns)
+            : null;
+    }
+
+    // Token under the cursor. A quote only opens a token when it is unbalanced —
+    // text after a closing quote (FROM "t" WHERE …) is not inside quotes.
+    function currentWord(before) {
+        const openQuote = ['"', "'"].find(q => before.split(q).length % 2 === 0);
+        if (openQuote) return before.slice(before.lastIndexOf(openQuote));
+        const plainM = before.match(/[\w.]+$/);
+        return plainM ? plainM[0] : '';
+    }
 
     // ── Context detection ───────────────────────────────────────────
     function detectContext(textBeforeWord) {
@@ -234,11 +296,15 @@ function initSqlAutocomplete() {
 
         if (['FROM', 'UPDATE', 'INTO'].includes(last))       return 'table';
         if (last === 'SELECT')                                return 'column';
-        if (last === ',' && /\bSELECT\b/i.test(cleaned) && !/\bFROM\b/i.test(cleaned)) return 'column';
+        if (last.endsWith('('))                               return 'column'; // begins_with( / contains( …
         if (['WHERE', 'AND', 'OR', 'NOT'].includes(last))    return 'column_fn';
         if (last === 'BY')                                    return 'column'; // ORDER BY
         if (last === 'SET')                                   return 'column';
-        if (last === ',' && /\bSET\b/i.test(cleaned))        return 'column';
+        // Column lists: SELECT a, b … / SET a = 1, … / ORDER BY a, …
+        if (last.endsWith(',')) {
+            if (/\bSELECT\b/i.test(cleaned) && !/\bFROM\b/i.test(cleaned)) return 'column';
+            if (/\b(SET|BY)\b/i.test(cleaned))                             return 'column';
+        }
         if (['=', '<>', '!=', '>', '<', '>=', '<=', 'IN', 'BETWEEN'].includes(last)) return 'value';
 
         // Column name immediately after WHERE / AND / OR → suggest operator
@@ -270,26 +336,23 @@ function initSqlAutocomplete() {
             return 2;                                // contains
         }
 
-        // Tables
-        if (context === 'table' || isQuoted) {
+        // Tables — a quoted token only means a table where a table is expected
+        if (context === 'table' || (isQuoted && context === 'keyword')) {
             state.tables
                 .filter(t => !clean || t.toUpperCase().includes(clean))
                 .forEach(t => push(`"${t}"`, 'table'));
         }
 
         // Columns (PK/SK first, with type hint)
-        if (['column', 'column_fn', 'operator'].includes(context) || isQuoted) {
-            const keySchema = state.tableInfo?.KeySchema || [];
-            const keyNames  = new Set(keySchema.map(k => k.AttributeName));
-            const attrDefs  = state.tableInfo?.AttributeDefinitions || [];
-            const typeMap   = Object.fromEntries(attrDefs.map(a => [a.AttributeName, a.AttributeType]));
+        if (columnInfo && (['column', 'column_fn', 'operator'].includes(context) || isQuoted)) {
+            const { columns, keyNames, typeMap } = columnInfo;
 
             // Keys first
-            state.allColumns
+            columns
                 .filter(c => keyNames.has(c) && (!clean || c.toUpperCase().includes(clean)))
                 .forEach(c => push(`"${c}"`, 'key', typeMap[c] || ''));
             // Then regular columns
-            state.allColumns
+            columns
                 .filter(c => !keyNames.has(c) && (!clean || c.toUpperCase().includes(clean)))
                 .forEach(c => push(`"${c}"`, 'column', typeMap[c] || ''));
         }
@@ -325,11 +388,10 @@ function initSqlAutocomplete() {
             return state.tables.slice(0, 10).map(t => ({ text: `"${t}"`, type: 'table', hint: '' }));
         }
         if (context === 'column' || context === 'column_fn') {
-            const keySchema = state.tableInfo?.KeySchema || [];
-            const keyNames  = new Set(keySchema.map(k => k.AttributeName));
-            const attrDefs  = state.tableInfo?.AttributeDefinitions || [];
-            const typeMap   = Object.fromEntries(attrDefs.map(a => [a.AttributeName, a.AttributeType]));
-            const cols = state.allColumns.map(c => ({
+            const { columns = [], keyNames = new Set(), typeMap = {} } = columnInfo || {};
+            // Keys first
+            const ordered = [...columns.filter(c => keyNames.has(c)), ...columns.filter(c => !keyNames.has(c))];
+            const cols = ordered.map(c => ({
                 text: `"${c}"`,
                 type: keyNames.has(c) ? 'key' : 'column',
                 hint: typeMap[c] || '',
@@ -400,11 +462,7 @@ function initSqlAutocomplete() {
         const before = val.substring(0, cursor);
 
         // Find start of current token (quoted or plain)
-        const quotedM  = before.match(/"[^"]*$|'[^']*$/);
-        const plainM   = before.match(/[\w.]+$/);
-        const wordStart = quotedM
-            ? cursor - quotedM[0].length
-            : plainM ? cursor - plainM[0].length : cursor;
+        const wordStart = cursor - currentWord(before).length;
 
         const after          = val.substring(cursor);
         const trailingSpace  = text.endsWith('(') ? '' : ' ';
@@ -428,12 +486,13 @@ function initSqlAutocomplete() {
         const cursor = ta.selectionStart;
         const before = val.substring(0, cursor);
 
-        const quotedM    = before.match(/"[^"]*$|'[^']*$/);
-        const plainM     = before.match(/[\w.]+$/);
-        const word       = quotedM ? quotedM[0] : (plainM ? plainM[0] : '');
+        const word       = currentWord(before);
+        // Inside a 'string literal' there is nothing useful to suggest
+        if (word.startsWith("'")) { hideDropdown(); return; }
         const beforeWord = before.substring(0, before.length - word.length);
         const context    = detectContext(beforeWord);
         const cleanQuery = word.replace(/^["']/, '');
+        columnInfo = context === 'table' ? null : getColumnInfo(targetTable(val));
 
         const suggestions = word.length === 0
             ? getDefaults(context)

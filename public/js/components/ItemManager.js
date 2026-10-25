@@ -30,6 +30,8 @@ const dom = {
     deletePreview: $('#delete-preview'),
     deleteCancelBtn: $('#delete-cancel-btn'),
     deleteConfirmBtn: $('#delete-confirm-btn'),
+    deleteTitle: $('#delete-modal-title'),
+    deleteMessage: $('#delete-modal-message'),
     
     addItemBtn: $('#add-item-btn'),
     loadingState: $('#loading-state'),
@@ -57,6 +59,10 @@ export function initItemManager() {
         openDeleteModal(e.detail.item);
     });
 
+    document.addEventListener('openBulkDeleteModalRequest', (e) => {
+        openBulkDeleteModal(e.detail.items);
+    });
+
     // Toggle form ↔ JSON in new-item modal
     $('#modal-mode-toggle')?.addEventListener('click', () => {
         insertMode = insertMode === 'form' ? 'json' : 'form';
@@ -70,7 +76,7 @@ export function initItemManager() {
         if (insertMode === 'form' && !state.editingItem) {
             item = buildItemFromForm();
             if (!item) {
-                dom.editorError.textContent = 'Erro ao ler formulário.';
+                dom.editorError.textContent = 'Could not read the form.';
                 dom.editorError.classList.remove('hidden');
                 return;
             }
@@ -120,6 +126,7 @@ export function initItemManager() {
     });
 
     dom.deleteConfirmBtn.addEventListener('click', async () => {
+        if (state.deletingTargets) return confirmBulkDelete();
         if (!state.deletingTarget) return;
 
         const keyNames = getKeyNames();
@@ -143,10 +150,6 @@ export function initItemManager() {
         if (e.key === 'Escape') {
             closeItemModal();
             closeDeleteModal();
-        }
-        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-            if (!dom.modalOverlay.classList.contains('hidden') || !dom.deleteOverlay.classList.contains('hidden')) return;
-            document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
         }
     });
 
@@ -184,7 +187,7 @@ function refreshNewItemView() {
 
     if (insertMode === 'form' && tpl) {
         const keyNames = getKeyNames();
-        dom.editorInfo.innerHTML = `Template: <strong>${state.currentTable}</strong> · ${tpl.length} campos`;
+        dom.editorInfo.innerHTML = `Template: <strong>${state.currentTable}</strong> · ${tpl.length} fields`;
         _showFormEditor(tpl);
     } else {
         const keyNames = getKeyNames();
@@ -234,11 +237,63 @@ function closeItemModal() {
 
 export function openDeleteModal(item) {
     state.deletingTarget = item;
+    state.deletingTargets = null;
+    dom.deleteTitle.textContent = 'Delete Item';
+    dom.deleteMessage.textContent = 'Are you sure you want to delete this item? This action cannot be undone.';
+    dom.deleteConfirmBtn.textContent = 'Delete';
     dom.deletePreview.textContent = JSON.stringify(item, null, 2);
     dom.deleteOverlay.classList.remove('hidden');
+}
+
+const BULK_PREVIEW_LIMIT = 50;
+
+export function openBulkDeleteModal(items) {
+    state.deletingTarget = null;
+    state.deletingTargets = items;
+    const keys = items.map(itemKey);
+    const n = items.length;
+    dom.deleteTitle.textContent = `Delete ${n} Item${n > 1 ? 's' : ''}`;
+    dom.deleteMessage.textContent = `Are you sure you want to delete ${n} item${n > 1 ? 's' : ''}? This action cannot be undone.`;
+    dom.deleteConfirmBtn.textContent = `Delete ${n}`;
+    let preview = keys.slice(0, BULK_PREVIEW_LIMIT).map(k => JSON.stringify(k)).join('\n');
+    if (n > BULK_PREVIEW_LIMIT) preview += `\n… and ${n - BULK_PREVIEW_LIMIT} more`;
+    dom.deletePreview.textContent = preview;
+    dom.deleteOverlay.classList.remove('hidden');
+}
+
+function itemKey(item) {
+    const key = {};
+    getKeyNames().forEach((k) => (key[k] = item[k]));
+    return key;
+}
+
+async function confirmBulkDelete() {
+    const keys = state.deletingTargets.map(itemKey);
+    dom.deleteConfirmBtn.disabled = true;
+    dom.deleteConfirmBtn.textContent = 'Deleting…';
+    try {
+        const connection = getActiveTabConnection();
+        const _t0 = Date.now();
+        const result = await api('POST', `/tables/${state.currentTable}/batch-delete`, { keys }, { connection });
+        trackWrite(state.currentTable, result?.consumedCapacity, 'batchDelete', Date.now() - _t0, result.deletedCount);
+        if (result.unprocessedKeysCount > 0) {
+            showToast(`${result.deletedCount} deleted, ${result.unprocessedKeysCount} not processed (throttled) — try again`, 'error');
+        } else {
+            showToast(`${result.deletedCount} item${result.deletedCount > 1 ? 's' : ''} deleted`, 'success');
+        }
+        closeDeleteModal();
+        document.dispatchEvent(new CustomEvent('clearRowSelectionRequest'));
+        document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
+    } catch (err) {
+        showToast(`Delete failed: ${err.message}`, 'error');
+        dom.deleteConfirmBtn.textContent = `Delete ${keys.length}`;
+    } finally {
+        dom.deleteConfirmBtn.disabled = false;
+    }
 }
 
 function closeDeleteModal() {
     dom.deleteOverlay.classList.add('hidden');
     state.deletingTarget = null;
+    state.deletingTargets = null;
 }

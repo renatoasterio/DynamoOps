@@ -35,7 +35,7 @@ router.get('/tables/:name/dashboard', (req, res) => tableController.dashboard(re
 router.delete('/tables/:name', requirePlan('pro'), (req, res) => tableController.delete(req, res));
 router.post('/tables/:name/truncate', requirePlan('pro'), (req, res) => tableController.truncate(req, res));
 router.post('/tables/:name/gsi', requirePlan('pro_plus'), (req, res) => tableController.createGsi(req, res));
-router.delete('/tables/:name/gsi/:gsiName', (req, res) => tableController.deleteGsi(req, res));
+router.delete('/tables/:name/gsi/:gsiName', requirePlan('pro_plus'), (req, res) => tableController.deleteGsi(req, res));
 router.get('/tables/:name/stream', (req, res) => tableController.getStreamStatus(req, res));
 router.get('/tables/:name/stream/records', requirePlan('pro'), (req, res) => tableController.getStreamRecords(req, res));
 
@@ -50,6 +50,7 @@ router.put('/tables/:name/items', requirePlan('pro'), (req, res) => itemControll
 router.patch('/tables/:name/items', requirePlan('pro'), (req, res) => itemController.updateAttribute(req, res));
 router.delete('/tables/:name/items', requirePlan('pro'), (req, res) => itemController.delete(req, res));
 router.post('/tables/:name/batch-write', requirePlan('pro'), (req, res) => itemController.batchWrite(req, res));
+router.post('/tables/:name/batch-delete', requirePlan('pro'), (req, res) => itemController.batchDelete(req, res));
 
 // ─── Import ───────────────────────────────────────────
 router.post('/import/parse-excel', requirePlan('pro'), upload.single('file'), (req, res) => importController.parseExcel(req, res));

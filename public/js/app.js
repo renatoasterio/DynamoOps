@@ -5,7 +5,6 @@ import { initDataViewer } from './components/DataViewer.js';
 import { initQueryPanel } from './components/QueryPanel.js';
 import { initItemManager } from './components/ItemManager.js';
 import { initThemeManager } from './components/ThemeManager.js';
-import { initProfileManager } from './components/ProfileManager.js';
 import { initHistoryManager } from './components/HistoryManager.js';
 import { initTabManager } from './components/TabManager.js';
 import { initLoginManager } from './components/LoginManager.js';
@@ -26,7 +25,6 @@ import './components/LicenseManager.js';
 document.addEventListener('DOMContentLoaded', () => {
     initThemeManager();
     initLoginManager();
-    initProfileManager();
     initHistoryManager();
     initTabManager();
     initConnectionManager();

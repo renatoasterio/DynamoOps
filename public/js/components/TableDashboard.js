@@ -21,7 +21,7 @@ function fmtNum(n) {
 
 function fmtDate(d) {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(d).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function statusColor(s) {
@@ -194,7 +194,7 @@ export function initTableDashboard() {
 }
 
 function openDashboard() {
-    if (!state.currentTable) { showToast('Selecione uma tabela primeiro', 'info'); return; }
+    if (!state.currentTable) { showToast('Select a table first', 'info'); return; }
     const panel = $('#dashboard-panel');
     if (!panel) return;
     panel.querySelector('.dash-table-name').textContent = state.currentTable;
@@ -211,14 +211,14 @@ async function loadDashboard() {
     if (!panel) return;
 
     const body = panel.querySelector('.dash-body');
-    body.innerHTML = '<div class="dash-loading">⏳ Carregando métricas…</div>';
+    body.innerHTML = '<div class="dash-loading">⏳ Loading metrics…</div>';
 
     try {
         const connection = getActiveTabConnection();
         const data = await api('GET', `/tables/${state.currentTable}/dashboard`, null, { connection });
         renderDashboard(data);
     } catch (err) {
-        body.innerHTML = `<div class="dash-error">Erro ao carregar métricas: ${err.message}</div>`;
-        showToast('Falha ao carregar dashboard', 'error');
+        body.innerHTML = `<div class="dash-error">Failed to load metrics: ${err.message}</div>`;
+        showToast('Failed to load dashboard', 'error');
     }
 }

@@ -38,24 +38,24 @@ export function initCodeGenerator() {
         const code = $('#code-gen-output')?.textContent;
         if (code) {
             navigator.clipboard.writeText(code)
-                .then(() => showToast('Código copiado!', 'success'))
-                .catch(() => showToast('Falha ao copiar', 'error'));
+                .then(() => showToast('Code copied!', 'success'))
+                .catch(() => showToast('Copy failed', 'error'));
         }
     });
 
     // SDK download button
     $('#code-gen-sdk-btn')?.addEventListener('click', async () => {
-        if (!state.currentTable) { showToast('Selecione uma tabela primeiro', 'info'); return; }
+        if (!state.currentTable) { showToast('Select a table first', 'info'); return; }
         const btn = $('#code-gen-sdk-btn');
         const origText = btn.textContent;
         try {
-            btn.textContent = '⏳ Gerando...';
+            btn.textContent = '⏳ Generating...';
             btn.disabled = true;
             const ki = getKeyInfo();
             await downloadSdk(currentLang, state.currentTable, ki, config.region || 'us-east-1');
-            showToast(`SDK ${currentLang} baixado!`, 'success');
+            showToast(`SDK ${currentLang} downloaded!`, 'success');
         } catch (err) {
-            showToast(`Erro ao gerar SDK: ${err.message}`, 'error');
+            showToast(`Failed to generate SDK: ${err.message}`, 'error');
         } finally {
             btn.textContent = origText;
             btn.disabled = false;
@@ -64,7 +64,7 @@ export function initCodeGenerator() {
 }
 
 function openModal() {
-    if (!state.currentTable) { showToast('Selecione uma tabela primeiro', 'info'); return; }
+    if (!state.currentTable) { showToast('Select a table first', 'info'); return; }
     const overlay = $('#code-gen-overlay');
     if (!overlay) return;
 
@@ -152,8 +152,8 @@ function renderCode() {
     const hintEl = $('#code-gen-hint-text');
     if (hintEl) {
         hintEl.innerHTML = currentMode === 'crud'
-            ? `Exemplo completo · <strong>PK</strong>: ${ki.pkName}${ki.skName ? ` · <strong>SK</strong>: ${ki.skName}` : ''}`
-            : `Reflete a query atual · <strong>double-click</strong> em uma célula para editar inline`;
+            ? `Full example · <strong>PK</strong>: ${ki.pkName}${ki.skName ? ` · <strong>SK</strong>: ${ki.skName}` : ''}`
+            : `Reflects the current query · <strong>double-click</strong> a cell to edit inline`;
     }
 
     let code = '';
@@ -629,7 +629,7 @@ function genNodejsCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkVal  = _jsVal(pkType);
     const skLine = skName ? `, ${skName}: ${_jsVal(skType)}` : '';
     const keyObj = `{ ${pkName}: ${pkVal}${skLine} }`;
-    return `// ── CRUD completo: ${table} ──────────────────────────────────────────────────
+    return `// ── Full CRUD: ${table} ──────────────────────────────────────────────────
 // Instale: npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
@@ -645,14 +645,14 @@ const TABLE     = "${table}";
 async function createItem() {
   const item = {
     ${pkName}: ${pkVal},${skName ? `\n    ${skName}: ${_jsVal(skType)},` : ''}
-    name: "Novo Item",
+    name: "New Item",
     createdAt: new Date().toISOString(),
   };
   await docClient.send(new PutCommand({ TableName: TABLE, Item: item }));
   console.log("✅ Criado:", item.${pkName});
 }
 
-// ── READ — buscar por chave ───────────────────────────────────────────────────
+// ── READ — fetch by key ───────────────────────────────────────────────────
 async function getItem() {
   const { Item } = await docClient.send(new GetCommand({
     TableName: TABLE,
@@ -679,7 +679,7 @@ async function updateItem() {
     Key: ${keyObj},
     UpdateExpression: "SET #name = :name, updatedAt = :ts",
     ExpressionAttributeNames:  { "#name": "name" },
-    ExpressionAttributeValues: { ":name": "Nome Atualizado", ":ts": new Date().toISOString() },
+    ExpressionAttributeValues: { ":name": "Updated Name", ":ts": new Date().toISOString() },
     ReturnValues: "ALL_NEW",
   }));
   console.log("✏️  Atualizado:", Attributes);
@@ -694,7 +694,7 @@ async function deleteItem() {
   console.log("🗑️  Deletado");
 }
 
-// ── Executar ──────────────────────────────────────────────────────────────────
+// ── Run ──────────────────────────────────────────────────────────────────
 (async () => {
   await createItem();
   await getItem();
@@ -708,7 +708,7 @@ function genPythonCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkVal  = _pyVal(pkType);
     const skLine = skName ? `, '${skName}': ${_pyVal(skType)}` : '';
     const keyExpr = `{'${pkName}': ${pkVal}${skLine}}`;
-    return `# ── CRUD completo: ${table} ─────────────────────────────────────────────────
+    return `# ── Full CRUD: ${table} ─────────────────────────────────────────────────
 # Instale: pip install boto3
 import boto3
 from datetime import datetime, timezone
@@ -720,13 +720,13 @@ table    = dynamodb.Table('${table}')
 def create_item():
     item = {
         '${pkName}': ${pkVal},${skName ? `\n        '${skName}': ${_pyVal(skType)},` : ''}
-        'name': 'Novo Item',
+        'name': 'New Item',
         'createdAt': datetime.now(timezone.utc).isoformat(),
     }
     table.put_item(Item=item)
     print(f"✅ Criado: {item['${pkName}']}")
 
-# ── READ — buscar por chave ───────────────────────────────────────────────────
+# ── READ — fetch by key ───────────────────────────────────────────────────
 def get_item():
     response = table.get_item(Key=${keyExpr})
     item = response.get('Item')
@@ -747,7 +747,7 @@ def update_item():
         UpdateExpression='SET #name = :name, updatedAt = :ts',
         ExpressionAttributeNames={'#name': 'name'},
         ExpressionAttributeValues={
-            ':name': 'Nome Atualizado',
+            ':name': 'Updated Name',
             ':ts': datetime.now(timezone.utc).isoformat(),
         },
         ReturnValues='ALL_NEW',
@@ -759,7 +759,7 @@ def delete_item():
     table.delete_item(Key=${keyExpr})
     print("🗑️  Deletado")
 
-# ── Executar ──────────────────────────────────────────────────────────────────
+# ── Run ──────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     create_item()
     get_item()
@@ -772,7 +772,7 @@ function genJavaCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkAttr  = _javaAttrVal(pkType, 'pk-value');
     const skLine  = skName ? `            "${skName}", ${_javaAttrVal(skType, 'sk-value')}` : '';
     const keyMapExtra = skLine ? `,\n${skLine}` : '';
-    return `// ── CRUD completo: ${table} ─────────────────────────────────────────────────
+    return `// ── Full CRUD: ${table} ─────────────────────────────────────────────────
 // Maven: software.amazon.awssdk:dynamodb:2.x
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -793,14 +793,14 @@ public class DynamoCrud {
             .tableName(TABLE)
             .item(Map.of(
                 "${pkName}", ${pkAttr}${skLine ? `,\n                "${skName}", ${_javaAttrVal(skType, 'sk-value')}` : ''},
-                "name",       AttributeValue.fromS("Novo Item"),
+                "name",       AttributeValue.fromS("New Item"),
                 "createdAt",  AttributeValue.fromS(Instant.now().toString())
             ))
             .build());
         System.out.println("✅ Criado");
     }
 
-    // ── READ — buscar por chave ───────────────────────────────────────────────
+    // ── READ — fetch by key ───────────────────────────────────────────────
     static void getItem() {
         var response = client.getItem(GetItemRequest.builder()
             .tableName(TABLE)
@@ -830,7 +830,7 @@ public class DynamoCrud {
             .updateExpression("SET #name = :name, updatedAt = :ts")
             .expressionAttributeNames(Map.of("#name", "name"))
             .expressionAttributeValues(Map.of(
-                ":name", AttributeValue.fromS("Nome Atualizado"),
+                ":name", AttributeValue.fromS("Updated Name"),
                 ":ts",   AttributeValue.fromS(Instant.now().toString())
             ))
             .returnValues(ReturnValue.ALL_NEW)
@@ -859,7 +859,7 @@ function genCsharpCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkAttr = _csAttrVal(pkType, 'pk-value');
     const skAttr = skName ? `\n        { "${skName}", ${_csAttrVal(skType, 'sk-value')} },` : '';
     const keyDict = `new Dictionary<string, AttributeValue>\n    {\n        { "${pkName}", ${pkAttr} },${skAttr}\n    }`;
-    return `// ── CRUD completo: ${table} ─────────────────────────────────────────────────
+    return `// ── Full CRUD: ${table} ─────────────────────────────────────────────────
 // NuGet: AWSSDK.DynamoDBv2
 using Amazon;
 using Amazon.DynamoDBv2;
@@ -875,14 +875,14 @@ async Task CreateItem() {
         TableName = TABLE,
         Item = new Dictionary<string, AttributeValue> {
             { "${pkName}", ${pkAttr} },${skName ? `\n            { "${skName}", ${_csAttrVal(skType, 'sk-value')} },` : ''}
-            { "name",      new AttributeValue { S = "Novo Item" } },
+            { "name",      new AttributeValue { S = "New Item" } },
             { "createdAt", new AttributeValue { S = DateTime.UtcNow.ToString("o") } },
         },
     });
     Console.WriteLine("✅ Criado");
 }
 
-// ── READ — buscar por chave ───────────────────────────────────────────────────
+// ── READ — fetch by key ───────────────────────────────────────────────────
 async Task GetItem() {
     var response = await client.GetItemAsync(new GetItemRequest {
         TableName = TABLE,
@@ -908,7 +908,7 @@ async Task UpdateItem() {
         UpdateExpression = "SET #name = :name, updatedAt = :ts",
         ExpressionAttributeNames  = new Dictionary<string, string> { { "#name", "name" } },
         ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
-            { ":name", new AttributeValue { S = "Nome Atualizado" } },
+            { ":name", new AttributeValue { S = "Updated Name" } },
             { ":ts",   new AttributeValue { S = DateTime.UtcNow.ToString("o") } },
         },
         ReturnValues = ReturnValue.ALL_NEW,
@@ -925,7 +925,7 @@ async Task DeleteItem() {
     Console.WriteLine("🗑️  Deletado");
 }
 
-// ── Executar ──────────────────────────────────────────────────────────────────
+// ── Run ──────────────────────────────────────────────────────────────────
 await CreateItem();
 await GetItem();
 await ListItems();
@@ -936,7 +936,7 @@ await DeleteItem();`;
 function genGoCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkAttr = _goAttrVal(pkType, 'pk-value');
     const skEntry = skName ? `\n        "${skName}": ${_goAttrVal(skType, 'sk-value')},` : '';
-    return `// ── CRUD completo: ${table} ─────────────────────────────────────────────────
+    return `// ── Full CRUD: ${table} ─────────────────────────────────────────────────
 // go get github.com/aws/aws-sdk-go-v2/...
 package main
 
@@ -966,7 +966,7 @@ func createItem() {
         TableName: aws.String(TABLE),
         Item: map[string]types.AttributeValue{
             "${pkName}":  ${pkAttr},${skEntry}
-            "name":       &types.AttributeValueMemberS{Value: "Novo Item"},
+            "name":       &types.AttributeValueMemberS{Value: "New Item"},
             "createdAt":  &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
         },
     })
@@ -974,7 +974,7 @@ func createItem() {
     fmt.Println("✅ Criado")
 }
 
-// ── READ — buscar por chave ───────────────────────────────────────────────────
+// ── READ — fetch by key ───────────────────────────────────────────────────
 func getItem() {
     result, err := client.GetItem(context.TODO(), &dynamodb.GetItemInput{
         TableName: aws.String(TABLE),
@@ -1002,7 +1002,7 @@ func updateItem() {
         UpdateExpression: aws.String("SET #name = :name, updatedAt = :ts"),
         ExpressionAttributeNames:  map[string]string{"#name": "name"},
         ExpressionAttributeValues: map[string]types.AttributeValue{
-            ":name": &types.AttributeValueMemberS{Value: "Nome Atualizado"},
+            ":name": &types.AttributeValueMemberS{Value: "Updated Name"},
             ":ts":   &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
         },
         ReturnValues: types.ReturnValueAllNew,
@@ -1033,7 +1033,7 @@ function genRubyCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkVal  = _rubyVal(pkType);
     const skLine = skName ? `\n    '${skName}' => ${_rubyVal(skType)},` : '';
     const keyHash = `{ '${pkName}' => ${pkVal}${skLine ? `,${skLine}` : ''} }`;
-    return `# ── CRUD completo: ${table} ─────────────────────────────────────────────────
+    return `# ── Full CRUD: ${table} ─────────────────────────────────────────────────
 # gem install aws-sdk-dynamodb
 require 'aws-sdk-dynamodb'
 
@@ -1047,14 +1047,14 @@ def create_item
   CLIENT.put_item(
     table_name: TABLE,
     item: KEY.merge(
-      'name'      => 'Novo Item',
+      'name'      => 'New Item',
       'createdAt' => Time.now.utc.iso8601
     )
   )
   puts '✅ Criado'
 end
 
-# ── READ — buscar por chave ───────────────────────────────────────────────────
+# ── READ — fetch by key ───────────────────────────────────────────────────
 def get_item
   resp = CLIENT.get_item(table_name: TABLE, key: KEY)
   puts "🔍 Item encontrado: #{resp.item}"
@@ -1076,7 +1076,7 @@ def update_item
     update_expression:          'SET #name = :name, updatedAt = :ts',
     expression_attribute_names: { '#name' => 'name' },
     expression_attribute_values: {
-      ':name' => 'Nome Atualizado',
+      ':name' => 'Updated Name',
       ':ts'   => Time.now.utc.iso8601
     },
     return_values: 'ALL_NEW'
@@ -1090,7 +1090,7 @@ def delete_item
   puts '🗑️  Deletado'
 end
 
-# ── Executar ──────────────────────────────────────────────────────────────────
+# ── Run ──────────────────────────────────────────────────────────────────
 create_item; get_item; list_items; update_item; delete_item`;
 }
 
@@ -1098,7 +1098,7 @@ function genPhpCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkAttr = _phpAttrVal(pkType, 'pk-value');
     const skEntry = skName ? `\n    '${skName}' => ${_phpAttrVal(skType, 'sk-value')},` : '';
     return `<?php
-// ── CRUD completo: ${table} ─────────────────────────────────────────────────
+// ── Full CRUD: ${table} ─────────────────────────────────────────────────
 // composer require aws/aws-sdk-php
 require 'vendor/autoload.php';
 
@@ -1115,14 +1115,14 @@ $key      = [
 // ── CREATE ────────────────────────────────────────────────────────────────────
 function createItem(DynamoDbClient $client, Marshaler $m, string $table, array $key): void {
     $item = array_merge($key, $m->marshalItem([
-        'name'      => 'Novo Item',
+        'name'      => 'New Item',
         'createdAt' => gmdate('c'),
     ]));
     $client->putItem(['TableName' => $table, 'Item' => $item]);
     echo "✅ Criado\\n";
 }
 
-// ── READ — buscar por chave ───────────────────────────────────────────────────
+// ── READ — fetch by key ───────────────────────────────────────────────────
 function getItem(DynamoDbClient $client, Marshaler $m, string $table, array $key): void {
     $result = $client->getItem(['TableName' => $table, 'Key' => $key]);
     $item   = isset($result['Item']) ? $m->unmarshalItem($result['Item']) : null;
@@ -1143,7 +1143,7 @@ function updateItem(DynamoDbClient $client, Marshaler $m, string $table, array $
         'Key'                       => $key,
         'UpdateExpression'          => 'SET #name = :name, updatedAt = :ts',
         'ExpressionAttributeNames'  => ['#name' => 'name'],
-        'ExpressionAttributeValues' => $m->marshalItem([':name' => 'Nome Atualizado', ':ts' => gmdate('c')]),
+        'ExpressionAttributeValues' => $m->marshalItem([':name' => 'Updated Name', ':ts' => gmdate('c')]),
         'ReturnValues'              => 'ALL_NEW',
     ]);
     echo "✏️  Atualizado\\n";
@@ -1155,7 +1155,7 @@ function deleteItem(DynamoDbClient $client, string $table, array $key): void {
     echo "🗑️  Deletado\\n";
 }
 
-// ── Executar ──────────────────────────────────────────────────────────────────
+// ── Run ──────────────────────────────────────────────────────────────────
 createItem($client, $m, $TABLE, $key);
 getItem($client, $m, $TABLE, $key);
 listItems($client, $m, $TABLE);
@@ -1167,7 +1167,7 @@ function genCliCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkCliVal = pkType === 'N' ? `'{"N":"1"}'` : `'{"S":"pk-value"}'`;
     const skCliLine = skName ? `\n  "${skName}": {"${skType === 'N' ? 'N' : 'S'}": "${skType === 'N' ? '1' : 'sk-value'}"}` : '';
     const keyJson = `'{"${pkName}":{"${pkType === 'N' ? 'N' : 'S'}":"${pkType === 'N' ? '1' : 'pk-value'}"}${skName ? `,"${skName}":{"${skType === 'N' ? 'N' : 'S'}":"${skType === 'N' ? '1' : 'sk-value'}"}` : ""}}'`;
-    return `# ── CRUD completo: ${table} ─────────────────────────────────────────────────
+    return `# ── Full CRUD: ${table} ─────────────────────────────────────────────────
 # Substitua os valores de chave antes de executar
 
 # ── CREATE ────────────────────────────────────────────────────────────────────
@@ -1175,12 +1175,12 @@ aws dynamodb put-item \\
   --table-name "${table}" \\
   --item '{
     "${pkName}": {"${pkType === 'N' ? 'N' : 'S'}": "${pkType === 'N' ? '1' : 'pk-value'}"},${skName ? `\n    "${skName}": {"${skType === 'N' ? 'N' : 'S'}": "${skType === 'N' ? '1' : 'sk-value'}"},` : ''}
-    "name":      {"S": "Novo Item"},
+    "name":      {"S": "New Item"},
     "createdAt": {"S": "2024-01-01T00:00:00Z"}
   }' \\
   --region ${region}
 
-# ── READ — buscar por chave ───────────────────────────────────────────────────
+# ── READ — fetch by key ───────────────────────────────────────────────────
 aws dynamodb get-item \\
   --table-name "${table}" \\
   --key ${keyJson} \\
@@ -1198,7 +1198,7 @@ aws dynamodb update-item \\
   --key ${keyJson} \\
   --update-expression "SET #name = :name, updatedAt = :ts" \\
   --expression-attribute-names '{"#name":"name"}' \\
-  --expression-attribute-values '{":name":{"S":"Nome Atualizado"},":ts":{"S":"2024-01-01T00:00:00Z"}}' \\
+  --expression-attribute-values '{":name":{"S":"Updated Name"},":ts":{"S":"2024-01-01T00:00:00Z"}}' \\
   --return-values ALL_NEW \\
   --region ${region}
 

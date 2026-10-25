@@ -369,7 +369,10 @@ function renderLoginProfiles() {
                         <div class="profile-name">${name}</div>
                         <div class="profile-meta">${p.sso ? '🌐 ' : p.roleArn ? '🛡️ ' : ''}${p.region} · ${p.sso ? `${p.sso.accountName || p.sso.accountId} / ${p.sso.roleName}` : p.roleArn ? p.roleArn.split('/').pop() : p.awsProfile}</div>
                     </div>
-                    <div class="profile-action">⚡</div>
+                    <div class="profile-actions">
+                        <button type="button" class="profile-delete-login" data-name="${name}" title="Delete saved profile">🗑</button>
+                        <div class="profile-action">⚡</div>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -382,6 +385,19 @@ function renderLoginProfiles() {
     
     dom.profilesList.innerHTML = html;
     
+    dom.profilesList.querySelectorAll('.profile-delete-login').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const name = btn.dataset.name;
+            if (!confirm(`Delete saved profile "${name}"?`)) return;
+            const current = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
+            delete current[name];
+            localStorage.setItem('dynamo-gui-profiles', JSON.stringify(current));
+            showToast(`Profile "${name}" deleted`, 'info');
+            document.dispatchEvent(new CustomEvent('profilesUpdated'));
+        });
+    });
+
     dom.profilesList.querySelectorAll('.saved-profile-item-login').forEach(item => {
         item.addEventListener('click', async () => {
             const id = item.dataset.id;
@@ -530,7 +546,7 @@ function resolveRoleArn() {
     if (fullArn) {
         return fullArn;
     }
-    throw new Error('Informe o Account ID e Role Name, ou cole o Role ARN completo.');
+    throw new Error('Enter the Account ID and Role Name, or paste the full Role ARN.');
 }
 
 /**
@@ -621,7 +637,7 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
 }
 
 async function assumeRole(roleArn, sessionName, region, profile, allowSave = false, envTag = 'none') {
-    if (!roleArn) throw new Error('Informe o Account ID e Role Name, ou cole o Role ARN completo.');
+    if (!roleArn) throw new Error('Enter the Account ID and Role Name, or paste the full Role ARN.');
     await resetPreviousSession();
 
     if (allowSave && dom.arSaveCheckbox && dom.arSaveCheckbox.checked) {
@@ -719,12 +735,12 @@ function _showRenewalPrompt(roleArn, sessionName, region, profile, envTag) {
     overlay.innerHTML = `
       <div style="background:var(--bg-elevated);border:1px solid var(--border-strong);border-radius:16px;padding:28px 32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.5)">
         <div style="font-size:32px;margin-bottom:12px">⏰</div>
-        <h3 style="color:var(--text-primary);font-size:16px;margin-bottom:8px">Sessão expirando</h3>
-        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:4px">A sessão <strong style="color:var(--accent)">${roleName}</strong> expira em menos de 5 minutos.</p>
-        <p style="color:var(--text-muted);font-size:12px;margin-bottom:20px">Renove agora para continuar sem interrupção.</p>
+        <h3 style="color:var(--text-primary);font-size:16px;margin-bottom:8px">Session expiring</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:4px">The <strong style="color:var(--accent)">${roleName}</strong> session expires in less than 5 minutes.</p>
+        <p style="color:var(--text-muted);font-size:12px;margin-bottom:20px">Renew now to continue without interruption.</p>
         <div style="display:flex;gap:10px;justify-content:center">
-          <button id="session-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">🔄 Renovar Sessão</button>
-          <button id="session-dismiss-btn" style="background:none;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer">Ignorar</button>
+          <button id="session-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">🔄 Renew Session</button>
+          <button id="session-dismiss-btn" style="background:none;border:1px solid var(--border-default);color:var(--text-secondary);border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer">Ignore</button>
         </div>
       </div>`;
 
@@ -737,9 +753,9 @@ function _showRenewalPrompt(roleArn, sessionName, region, profile, envTag) {
         const btn = document.getElementById('session-renew-btn');
         try {
             await assumeRole(roleArn, sessionName || 'dev-session', region, profile, false, envTag);
-            showToast('Sessão renovada com sucesso!', 'success');
+            showToast('Session renewed successfully!', 'success');
         } catch (err) {
-            showToast(`Falha ao renovar: ${err.message}`, 'error');
+            showToast(`Renewal failed: ${err.message}`, 'error');
         }
     });
 
@@ -767,9 +783,9 @@ function _showSessionExpiredPrompt(roleArn, sessionName, region, profile, envTag
     overlay.innerHTML = `
       <div style="background:var(--bg-elevated);border:1px solid rgba(248,113,113,0.4);border-radius:16px;padding:28px 32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6)">
         <div style="font-size:32px;margin-bottom:12px">🔒</div>
-        <h3 style="color:#f87171;font-size:16px;margin-bottom:8px">Sessão expirada</h3>
-        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">A sessão <strong>${roleName}</strong> expirou. Renove para continuar.</p>
-        <button id="session-expired-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%">🔄 Renovar Agora</button>
+        <h3 style="color:#f87171;font-size:16px;margin-bottom:8px">Session expired</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">The <strong>${roleName}</strong> session has expired. Renew to continue.</p>
+        <button id="session-expired-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%">🔄 Renew Now</button>
       </div>`;
 
     document.body.appendChild(overlay);
@@ -778,9 +794,9 @@ function _showSessionExpiredPrompt(roleArn, sessionName, region, profile, envTag
         overlay.remove();
         try {
             await assumeRole(roleArn, sessionName || 'dev-session', region, profile, false, envTag);
-            showToast('Sessão renovada!', 'success');
+            showToast('Session renewed!', 'success');
         } catch (err) {
-            showToast(`Falha ao renovar: ${err.message}`, 'error');
+            showToast(`Renewal failed: ${err.message}`, 'error');
             // Fall back to login screen
             logout();
         }

@@ -142,8 +142,8 @@
 
                     <!-- Optional: Session Name -->
                     <div class="form-group ar-session-group">
-                        <label>Session Name <span class="form-hint">opcional</span></label>
-                        <input type="text" id="login-ar-session" placeholder="dev-session (padrão)" autocomplete="off" />
+                        <label>Session Name <span class="form-hint">optional</span></label>
+                        <input type="text" id="login-ar-session" placeholder="dev-session (default)" autocomplete="off" />
                     </div>
 
                     <!-- Hidden ARN (built from Account ID + Role Name) -->
@@ -160,7 +160,7 @@
 
                     <!-- Role History -->
                     <div id="ar-role-history" class="ar-role-history hidden">
-                        <div class="ar-history-label">Histórico de funções</div>
+                        <div class="ar-history-label">Role history</div>
                         <div id="ar-history-list" class="ar-history-list"></div>
                     </div>
                 </div>
@@ -382,6 +382,11 @@
                     <button id="add-item-btn" class="btn btn-primary" title="Insert Item">➕ <span class="btn-label">Insert Item</span></button>
                     <button id="template-btn" class="toolbar-icon-btn" title="Item Template — structured insert form">🧩 <span class="btn-label">Template</span><span class="tpl-badge"></span></button>
                     <button id="refresh-table-btn" class="toolbar-icon-btn" title="Refresh Data">🔄</button>
+                    <div id="bulk-actions" class="bulk-actions hidden">
+                        <span class="bulk-count"><strong id="bulk-selected-count">0</strong> selected</span>
+                        <button id="bulk-delete-btn" class="toolbar-icon-btn bulk-delete-btn" title="Delete selected items">🗑 <span class="btn-label">Delete</span></button>
+                        <button id="bulk-clear-btn" class="toolbar-icon-btn" title="Clear selection">✕</button>
+                    </div>
                     <div class="search-container-premium">
                         <span class="search-icon">🔍</span>
                         <input type="text" id="table-search-input" placeholder="Filter loaded items..." />
@@ -474,12 +479,10 @@
                             <label>Condition</label>
                             <select id="query-sk-op">
                                 <option value="=">=</option>
-                                <option value="<">
-                                    << /option>
-                                <option value="<=">
-                                    <=< /option>
-                                <option value=">">></option>
-                                <option value=">=">>=</option>
+                                <option value="<">&lt;</option>
+                                <option value="<=">&lt;=</option>
+                                <option value=">">&gt;</option>
+                                <option value=">=">&gt;=</option>
                                 <option value="begins_with">begins_with</option>
                                 <option value="between">between</option>
                             </select>
@@ -577,6 +580,12 @@
                     </div>
                 </div>
                 <div id="json-view" class="data-view hidden">
+                    <div class="json-format-bar">
+                        <div class="view-toggle" id="json-format-toggle">
+                            <button class="toggle-btn active" data-format="plain" title="Plain JSON — native values">JSON</button>
+                            <button class="toggle-btn" data-format="dynamo" title="DynamoDB JSON — typed AttributeValues (S, N, BOOL, M, L, NULL)">DynamoDB JSON</button>
+                        </div>
+                    </div>
                     <div id="json-content"></div>
                 </div>
 
@@ -585,17 +594,17 @@
                     <div class="chart-view-header">
                         <div class="chart-sub-tabs">
                             <button id="chart-tab-timeline"     class="chart-sub-tab active">📈 Timeline</button>
-                            <button id="chart-tab-distribution" class="chart-sub-tab">📊 Distribuição</button>
+                            <button id="chart-tab-distribution" class="chart-sub-tab">📊 Distribution</button>
                             <button id="chart-tab-heatmap"      class="chart-sub-tab">🔥 Heatmap</button>
                         </div>
                         <div class="chart-controls">
-                            <select id="chart-date-field" class="chart-select" title="Campo de data"></select>
+                            <select id="chart-date-field" class="chart-select" title="Date field"></select>
                             <select id="chart-granularity" class="chart-select">
-                                <option value="hour">Por Hora</option>
-                                <option value="day" selected>Por Dia</option>
-                                <option value="month">Por Mês</option>
+                                <option value="hour">Hourly</option>
+                                <option value="day" selected>Daily</option>
+                                <option value="month">Monthly</option>
                             </select>
-                            <select id="chart-num-field" class="chart-select hidden" title="Campo numérico"></select>
+                            <select id="chart-num-field" class="chart-select hidden" title="Numeric field"></select>
                         </div>
                     </div>
                     <div id="chart-panel-timeline"     class="chart-panel"></div>
@@ -658,11 +667,11 @@
     <div id="delete-overlay" class="hidden">
         <div id="delete-modal">
             <div class="modal-header">
-                <h3>Delete Item</h3>
+                <h3 id="delete-modal-title">Delete Item</h3>
                 <button id="delete-close-btn" class="icon-btn">✕</button>
             </div>
             <div class="modal-body">
-                <p>Are you sure you want to delete this item? This action cannot be undone.</p>
+                <p id="delete-modal-message">Are you sure you want to delete this item? This action cannot be undone.</p>
                 <pre id="delete-preview"></pre>
             </div>
             <div class="modal-footer">
@@ -957,82 +966,6 @@
         </div>
     </div>
 
-    <!-- ─── Modal: Assume Role Login ───────────────────────────────── -->
-    <div id="assume-role-overlay" class="hidden">
-        <div id="assume-role-modal">
-            <div class="modal-header assume-role-header">
-                <div class="assume-role-title">
-                    <span class="assume-role-icon">🔐</span>
-                    <h3>AWS Assume Role</h3>
-                </div>
-                <button id="assume-role-close-btn" class="icon-btn">✕</button>
-            </div>
-            <div class="modal-body">
-                <p class="assume-role-description">Authenticate using <code>sts:AssumeRole</code> to get temporary
-                    credentials for DynamoDB access.</p>
-                <div class="assume-role-form">
-                    <div class="form-group">
-                        <label for="ar-role-arn">Role ARN <span class="required">*</span></label>
-                        <input type="text" id="ar-role-arn" value="arn:aws:iam::763165854963:role/DevelopersRole"
-                            placeholder="arn:aws:iam::123456789012:role/RoleName" />
-                    </div>
-                    <div class="form-group">
-                        <label for="ar-session-name">Session Name</label>
-                        <input type="text" id="ar-session-name" value="dev-session" placeholder="my-session" />
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="ar-region">Region</label>
-                            <select id="ar-region">
-                                <option value="us-east-1">us-east-1</option>
-                                <option value="us-east-2">us-east-2</option>
-                                <option value="us-west-1">us-west-1</option>
-                                <option value="us-west-2">us-west-2</option>
-                                <option value="eu-west-1">eu-west-1</option>
-                                <option value="eu-west-2">eu-west-2</option>
-                                <option value="eu-central-1">eu-central-1</option>
-                                <option value="ap-southeast-1">ap-southeast-1</option>
-                                <option value="ap-southeast-2">ap-southeast-2</option>
-                                <option value="ap-northeast-1">ap-northeast-1</option>
-                                <option value="ap-south-1">ap-south-1</option>
-                                <option value="sa-east-1">sa-east-1</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="ar-profile">AWS Profile</label>
-                            <input type="text" id="ar-profile" value="default" placeholder="default" />
-                        </div>
-                    </div>
-                    <div id="ar-error" class="error-msg hidden"></div>
-                    <div class="assume-role-cmd-preview">
-                        <div class="cmd-label">Equivalent CLI command:</div>
-                        <code
-                            id="ar-cmd-preview">aws sts assume-role --role-arn arn:aws:iam::763165854963:role/DevelopersRole --role-session-name dev-session</code>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="ar-cancel-btn" class="btn-secondary">Cancel</button>
-                <button id="ar-login-btn" class="btn-assume-role-submit">
-                    <span class="btn-icon">🔐</span> Login & Connect
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ─── Modal: Manage Profiles ────────────────────────────────── -->
-    <div id="manage-profiles-overlay" class="hidden">
-        <div id="manage-profiles-modal" class="modal-content">
-            <div class="modal-header">
-                <h3>Manage Profiles</h3>
-                <button id="manage-profiles-close-btn" class="icon-btn">✕</button>
-            </div>
-            <div class="modal-body">
-                <div id="manage-profiles-list"></div>
-            </div>
-        </div>
-    </div>
-
     <!-- ─── Modal: Import ───────────────────────────────────────────── -->
     <div id="import-overlay" class="modal-overlay hidden">
         <div class="modal import-modal">
@@ -1259,7 +1192,7 @@
 
         <!-- Pricing reference -->
         <div class="cost-pricing-footer">
-            Pricing: $0.00013 / RCU · $0.00065 / WCU (us-east-1, on-demand)
+            Pricing: $0.125 per 1M RCU · $0.625 per 1M WCU (us-east-1, on-demand)
         </div>
     </div>
 
@@ -1294,14 +1227,14 @@
                 <button id="template-editor-close" class="modal-close-btn">✕</button>
             </div>
             <div class="modal-body tpl-modal-body">
-                <p class="tpl-description">Defina os campos padrão para inserção de novos items. Campos com template usam formulário estruturado ao invés de JSON livre.</p>
+                <p class="tpl-description">Define the default fields for inserting new items. Tables with a template use a structured form instead of free-form JSON.</p>
                 <div id="template-fields-list" class="tpl-fields-list"></div>
             </div>
             <div class="modal-footer">
-                <button id="template-add-field-btn" class="btn-ghost">＋ Adicionar Campo</button>
+                <button id="template-add-field-btn" class="btn-ghost">＋ Add Field</button>
                 <div style="flex:1"></div>
-                <button id="template-delete-btn" class="btn-secondary" style="color:var(--danger)">🗑 Remover Template</button>
-                <button id="template-save-btn" class="btn-primary">💾 Salvar Template</button>
+                <button id="template-delete-btn" class="btn-secondary" style="color:var(--danger)">🗑 Remove Template</button>
+                <button id="template-save-btn" class="btn-primary">💾 Save Template</button>
             </div>
         </div>
     </div>

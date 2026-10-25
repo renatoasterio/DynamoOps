@@ -38,6 +38,13 @@ let dragSrcIdx = null;
 let colWidths  = {};
 // lastSorted: shallow copy of current sorted items (updated each renderTableView)
 let lastSorted = [];
+// Multi-row selection — ids are the JSON of the item's key values
+let selectedKeys   = new Set();
+let selectionTable = null;
+let lastCheckedIdx = null;
+// JSON view format: 'plain' (native values) | 'dynamo' (typed AttributeValues)
+let jsonFormat = 'plain';
+try { if (localStorage.getItem('dynamoops.jsonFormat') === 'dynamo') jsonFormat = 'dynamo'; } catch { /* storage unavailable */ }
 
 export function initDataViewer() {
     if (dom.viewTableBtn) {
@@ -113,6 +120,28 @@ export function initDataViewer() {
 
     // Inline cell editing — event delegation (double-click on data cells)
     dom.dataTbody?.addEventListener('dblclick', handleCellDblClick);
+
+    // JSON ↔ DynamoDB JSON format toggle
+    const formatToggle = $('#json-format-toggle');
+    formatToggle?.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.format === jsonFormat);
+        btn.addEventListener('click', () => {
+            jsonFormat = btn.dataset.format;
+            try { localStorage.setItem('dynamoops.jsonFormat', jsonFormat); } catch { /* storage unavailable */ }
+            formatToggle.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
+            document.dispatchEvent(new CustomEvent('renderDataRequest'));
+        });
+    });
+
+    // Multi-row selection
+    dom.dataTbody?.addEventListener('click', handleRowSelectClick);
+    $('#bulk-delete-btn')?.addEventListener('click', () => {
+        const items = getSelectedItems();
+        if (!items.length) return;
+        document.dispatchEvent(new CustomEvent('openBulkDeleteModalRequest', { detail: { items } }));
+    });
+    $('#bulk-clear-btn')?.addEventListener('click', clearSelection);
+    document.addEventListener('clearRowSelectionRequest', clearSelection);
 }
 
 export function resetDataViewer() {
@@ -128,6 +157,7 @@ export function resetDataViewer() {
     sortCol   = null;
     sortDir   = null;
     colWidths = {};
+    clearSelection();
     if (dom.searchInput) dom.searchInput.value = '';
     const pc = $('#pagination-controls');
     if (pc) pc.classList.add('hidden');
@@ -178,6 +208,8 @@ function renderTableInfo(table) {
     });
 
     const gsis = table.GlobalSecondaryIndexes || [];
+    // Index management is a Pro+ feature; without a license manager (no-license build) everything is allowed.
+    const canManageIndexes = window.licenseManager?.hasPlan?.('pro_plus') ?? true;
     gsis.forEach((gsi) => {
         const gsiPk = gsi.KeySchema?.find(k => k.KeyType === 'HASH')?.AttributeName || '';
         const gsiSk = gsi.KeySchema?.find(k => k.KeyType === 'RANGE')?.AttributeName;
@@ -188,7 +220,7 @@ function renderTableInfo(table) {
             <span class="key-type">GSI</span>${gsi.IndexName}
             <span class="gsi-keys">${keyInfo}</span>
             ${status !== 'ACTIVE' ? `<span class="gsi-status">${status}</span>` : ''}
-            <button class="gsi-delete-btn" data-gsi="${gsi.IndexName}" title="Delete GSI">✕</button>
+            ${canManageIndexes ? `<button class="gsi-delete-btn" data-gsi="${gsi.IndexName}" title="Delete GSI">✕</button>` : ''}
         </span>`);
     });
 
@@ -248,9 +280,12 @@ function renderTableView(items = state.items) {
     const keyNames = getKeyNames();
     const sorted = getSortedItems(items);
     lastSorted = sorted;
+    lastCheckedIdx = null;
+    pruneSelection();
 
     // ── thead with sort indicators + drag-and-drop ──
     let thead = '<tr>';
+    thead += '<th class="cell-select"><input type="checkbox" id="select-all-rows" title="Select all visible rows" /></th>';
     thead += '<th style="width:80px">Actions</th>';
     state.allColumns.forEach((col, colIdx) => {
         const isKey = keyNames.includes(col);
@@ -271,6 +306,18 @@ function renderTableView(items = state.items) {
     });
     thead += '</tr>';
     dom.dataThead.innerHTML = thead;
+
+    $('#select-all-rows')?.addEventListener('change', (e) => {
+        lastSorted.forEach(item => {
+            if (e.target.checked) selectedKeys.add(itemKeyId(item));
+            else selectedKeys.delete(itemKeyId(item));
+        });
+        dom.dataTbody.querySelectorAll('.row-select-cb').forEach(cb => {
+            cb.checked = e.target.checked;
+            cb.closest('tr').classList.toggle('row-selected', e.target.checked);
+        });
+        updateSelectionUI();
+    });
 
     // ── Sort click listeners ──
     dom.dataThead.querySelectorAll('.col-sortable').forEach(th => {
@@ -357,7 +404,9 @@ function renderTableView(items = state.items) {
     // ── tbody ──
     let tbody = '';
     sorted.forEach((item, idx) => {
-        tbody += '<tr>';
+        const isSelected = selectedKeys.has(itemKeyId(item));
+        tbody += `<tr${isSelected ? ' class="row-selected"' : ''}>`;
+        tbody += `<td class="cell-select"><input type="checkbox" class="row-select-cb" data-idx="${idx}"${isSelected ? ' checked' : ''} /></td>`;
         tbody += `<td class="cell-actions">
       <button class="row-action-btn edit" data-idx="${idx}" title="Edit">✎</button>
       <button class="row-action-btn copy" data-idx="${idx}" title="Copy JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
@@ -398,6 +447,70 @@ function renderTableView(items = state.items) {
             document.dispatchEvent(new CustomEvent('openDeleteModalRequest', { detail: { item: sorted[btn.dataset.idx] } }));
         });
     });
+
+    updateSelectionUI();
+}
+
+// ─── Multi-row selection ─────────────────────────────────────────────────────
+function itemKeyId(item) {
+    return JSON.stringify(getKeyNames().map(k => item[k]));
+}
+
+// Drop selections that no longer exist (new query, deleted rows, table switch)
+function pruneSelection() {
+    if (selectionTable !== state.currentTable) {
+        selectedKeys.clear();
+        selectionTable = state.currentTable;
+    }
+    const present = new Set((state.items || []).map(itemKeyId));
+    for (const id of selectedKeys) if (!present.has(id)) selectedKeys.delete(id);
+}
+
+function getSelectedItems() {
+    return (state.items || []).filter(item => selectedKeys.has(itemKeyId(item)));
+}
+
+function clearSelection() {
+    selectedKeys.clear();
+    lastCheckedIdx = null;
+    dom.dataTbody?.querySelectorAll('.row-select-cb').forEach(cb => {
+        cb.checked = false;
+        cb.closest('tr').classList.remove('row-selected');
+    });
+    updateSelectionUI();
+}
+
+function handleRowSelectClick(e) {
+    const cb = e.target.closest('.row-select-cb');
+    if (!cb) return;
+    const idx = parseInt(cb.dataset.idx);
+    // Shift+click selects/deselects the whole range since the last clicked row
+    const [from, to] = e.shiftKey && lastCheckedIdx !== null
+        ? [Math.min(lastCheckedIdx, idx), Math.max(lastCheckedIdx, idx)]
+        : [idx, idx];
+    const rows = dom.dataTbody.querySelectorAll('.row-select-cb');
+    for (let i = from; i <= to; i++) {
+        const id = itemKeyId(lastSorted[i]);
+        if (cb.checked) selectedKeys.add(id); else selectedKeys.delete(id);
+        rows[i].checked = cb.checked;
+        rows[i].closest('tr').classList.toggle('row-selected', cb.checked);
+    }
+    lastCheckedIdx = idx;
+    updateSelectionUI();
+}
+
+function updateSelectionUI() {
+    const count = selectedKeys.size;
+    $('#bulk-actions')?.classList.toggle('hidden', count === 0);
+    const countEl = $('#bulk-selected-count');
+    if (countEl) countEl.textContent = count;
+
+    const selectAll = $('#select-all-rows');
+    if (selectAll) {
+        const visibleSelected = lastSorted.filter(item => selectedKeys.has(itemKeyId(item))).length;
+        selectAll.checked = lastSorted.length > 0 && visibleSelected === lastSorted.length;
+        selectAll.indeterminate = visibleSelected > 0 && visibleSelected < lastSorted.length;
+    }
 }
 
 function renderJsonView(items = state.items) {
@@ -406,8 +519,11 @@ function renderJsonView(items = state.items) {
         return;
     }
 
+    // Edit / clone / delete always work on the native item; only display & copy follow the format
+    const displayItems = jsonFormat === 'dynamo' ? items.map(toDynamoJson) : items;
+
     let html = '';
-    items.forEach((item, index) => {
+    displayItems.forEach((item, index) => {
         html += `
             <div class="json-record-compass" data-idx="${index}">
                 ${buildCompassJson(item, true, true, null)}
@@ -435,7 +551,7 @@ function renderJsonView(items = state.items) {
     dom.jsonContent.querySelectorAll('.copy-rec').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const idx = e.currentTarget.closest('.json-record-compass').dataset.idx;
-            const item = items[idx];
+            const item = displayItems[idx];
             if (item) {
                 navigator.clipboard.writeText(JSON.stringify(item, null, 2))
                     .then(() => showToast('Record copied to clipboard', 'success'))
@@ -450,6 +566,21 @@ function renderJsonView(items = state.items) {
             document.dispatchEvent(new CustomEvent('openDeleteModalRequest', { detail: { item: items[idx] } }));
         });
     });
+}
+
+// Native item → DynamoDB JSON (top-level attribute map of typed AttributeValues)
+export function toDynamoJson(item) {
+    return Object.fromEntries(Object.entries(item).map(([k, v]) => [k, toAttributeValue(v)]));
+}
+
+function toAttributeValue(value) {
+    if (value === null || value === undefined) return { NULL: true };
+    if (typeof value === 'string') return { S: value };
+    if (typeof value === 'number') return { N: String(value) };
+    if (typeof value === 'boolean') return { BOOL: value };
+    if (Array.isArray(value)) return { L: value.map(toAttributeValue) };
+    if (typeof value === 'object') return { M: toDynamoJson(value) };
+    return { S: String(value) };
 }
 
 function buildCompassJson(data, isRoot = false, isLast = true, keyName = null) {
@@ -738,7 +869,7 @@ function handleCellDblClick(e) {
 
     const keyNames = getKeyNames();
     if (keyNames.includes(col)) {
-        showToast('Chaves primárias não podem ser editadas inline. Use ✎ para editar o item completo.', 'info');
+        showToast('Primary keys cannot be edited inline. Use ✎ to edit the full item.', 'info');
         return;
     }
 
@@ -844,9 +975,9 @@ async function _applyInlineEdit(td, col, itemIdx, origVal, rawStr, origDisplay) 
 
         td.innerHTML = `<div class="cell-value">${newVal === undefined ? '' : formatCellValue(newVal)}</div>`;
         td.title     = escapeHtml(JSON.stringify(newVal) ?? '');
-        showToast(`"${col}" atualizado`, 'success');
+        showToast(`"${col}" updated`, 'success');
     } catch (err) {
         td.innerHTML = origDisplay;
-        showToast(`Falha ao salvar: ${err.message}`, 'error');
+        showToast(`Save failed: ${err.message}`, 'error');
     }
 }

@@ -186,8 +186,8 @@ function buildCard({ name, type, status, pk, sk, typeMap, projection, billingMod
         metaHtml = `<span class="idx-value">On-demand</span>`;
     } else {
         metaHtml = `
-            <span class="idx-muted">RCU <strong>${fmtNum(throughput.readCapacityUnits)}</strong>
-             &nbsp;WCU <strong>${fmtNum(throughput.writeCapacityUnits)}</strong></span>`;
+            <span class="idx-muted">RCU <strong>${fmtNum(throughput.ReadCapacityUnits ?? throughput.readCapacityUnits)}</strong>
+             &nbsp;WCU <strong>${fmtNum(throughput.WriteCapacityUnits ?? throughput.writeCapacityUnits)}</strong></span>`;
     }
     if (sizeBytes != null) metaHtml += `<span class="idx-muted">${fmtBytes(sizeBytes)} · ${fmtNum(itemCount ?? 0)} items</span>`;
 

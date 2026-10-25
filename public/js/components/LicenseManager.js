@@ -58,6 +58,11 @@ class LicenseManager {
         return this._planLevel(current) >= this._planLevel(required);
     }
 
+    /** Public check used by components that render gated controls dynamically. */
+    hasPlan(required) {
+        return this._hasPlan(required);
+    }
+
     // ─── Apply plan restrictions to the UI ───────────────────────────
     // Each entry: { id, requiredPlan, action }
     // action 'hide'    → display:none (feature doesn't exist for this plan)
@@ -66,6 +71,7 @@ class LicenseManager {
         const rules = [
             // ── Pro features ─────────────────────────────────────────
             { id: 'add-item-btn',        required: 'pro', action: 'hide' },
+            { id: 'bulk-delete-btn',     required: 'pro', action: 'hide' },
             { id: 'template-btn',        required: 'pro', action: 'hide' },
             { id: 'import-btn',          required: 'pro', action: 'hide' },
             { id: 'export-json-btn',     required: 'pro', action: 'hide' },
@@ -80,6 +86,11 @@ class LicenseManager {
             { id: 'indexes-btn',         required: 'pro_plus', action: 'hide' },
             { id: 'code-gen-btn',        required: 'pro_plus', action: 'hide' },
         ];
+
+        // Dynamically rendered controls (schema-bar GSI delete buttons) are swept here too.
+        document.querySelectorAll('.gsi-delete-btn').forEach(el => {
+            el.style.display = this._hasPlan('pro_plus') ? '' : 'none';
+        });
 
         for (const { id, required, action } of rules) {
             const el = document.getElementById(id);
@@ -276,7 +287,7 @@ class LicenseManager {
                     ${status.teamRole ? `<span class="license-team-role">${status.teamRole === 'owner' ? '👑 Owner' : '👤 Member'}</span>` : ''}
                 </div>
                 ${status.email ? `<div class="license-email">Registered to <strong>${this._escape(status.email)}</strong></div>` : ''}
-                ${status.expiresAt ? `<div class="license-renews">Renews automatically on <strong>${new Date(status.expiresAt).toLocaleDateString()}</strong></div>` : ''}
+                ${status.expiresAt ? `<div class="license-renews">License check valid until <strong>${new Date(status.expiresAt).toLocaleDateString()}</strong></div>` : ''}
                 ${warnings}
             </div>
             ${plan === 'team' ? `
