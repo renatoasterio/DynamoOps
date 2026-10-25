@@ -36,6 +36,7 @@ module.exports = {
         try {
             const result = await ssoService.connect(req.body || {});
             const tableCount = await dynamoService.testConnection(awsConfig.activeClients());
+            awsConfig.setEnvTag(req.body?.envTag);
             awsConfig.setConnected(true);
             res.json({ success: true, config: result.config, role: result.role, tableCount });
         } catch (err) {

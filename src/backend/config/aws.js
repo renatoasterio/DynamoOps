@@ -80,7 +80,11 @@ function getCachedClients(config, explicitCredentials) {
     return clients;
 }
 
-let globalConfig = { region: 'us-east-1', profile: 'default', endpoint: '' };
+// Environment labels the UI can attach to a session (shown as a header badge)
+const ENV_TAGS = new Set(['none', 'dev', 'qa', 'staging', 'prod', 'local']);
+const normalizeEnvTag = (tag) => (ENV_TAGS.has(tag) ? tag : 'none');
+
+let globalConfig = { region: 'us-east-1', profile: 'default', endpoint: '', envTag: 'none' };
 let assumedRoleInfo = null;
 let isConnected = false;
 
@@ -104,6 +108,9 @@ module.exports = {
         globalClients = getCachedClients(config, explicitCredentials);
     },
     setAssumedRoleInfo: (info) => { assumedRoleInfo = info; },
-    setCurrentConfig: (config) => { globalConfig = config; },
+    setCurrentConfig: (config) => { globalConfig = { envTag: 'none', ...config }; },
+    /** Labels the active session (dev / prod / …) so a page reload can restore it. */
+    setEnvTag: (tag) => { globalConfig = { ...globalConfig, envTag: normalizeEnvTag(tag) }; },
+    normalizeEnvTag,
     setConnected: (value) => { isConnected = value; },
 };

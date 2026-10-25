@@ -2,7 +2,7 @@ const awsConfig = require('../config/aws');
 const { assumeRole } = require('../services/stsService');
 const dynamoService = require('../services/dynamoService');
 
-const DEFAULT_CONFIG = { region: 'us-east-1', profile: 'default', endpoint: '' };
+const DEFAULT_CONFIG = { region: 'us-east-1', profile: 'default', endpoint: '', envTag: 'none' };
 
 module.exports = {
     getConfig(_req, res) {
@@ -14,11 +14,12 @@ module.exports = {
     },
 
     async connect(req, res) {
-        const { region, profile, endpoint } = req.body || {};
+        const { region, profile, endpoint, envTag } = req.body || {};
         const newConfig = {
             region: region || DEFAULT_CONFIG.region,
             profile: profile || DEFAULT_CONFIG.profile,
             endpoint: endpoint || DEFAULT_CONFIG.endpoint,
+            envTag: awsConfig.normalizeEnvTag(envTag),
         };
 
         // Clear any previous assumed-role session so the middleware
@@ -42,6 +43,7 @@ module.exports = {
     async handleAssumeRole(req, res) {
         const result = await assumeRole(req.body || {});
         const tableCount = await dynamoService.testConnection(awsConfig.activeClients());
+        awsConfig.setEnvTag(req.body?.envTag);
         awsConfig.setConnected(true);
         res.json({ success: true, config: result.config, role: result.role, tableCount });
     },

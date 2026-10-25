@@ -44,6 +44,23 @@ function updateConnInfoBadge(region, endpoint) {
     badge.classList.remove('hidden');
 }
 
+/**
+ * Mirrors an established connection in the shared config and the header
+ * (env badge, provider/region badge, status). Used by every sign-in flow and
+ * when a page reload restores the backend's session.
+ */
+export function applyConnectedState({ region, profile, endpoint = '', envTag = 'none' }) {
+    state.connected = true;
+    Object.assign(config, { region, profile, endpoint, envTag });
+    showEnvBadge(envTag);
+    updateConnInfoBadge(region, endpoint);
+    const connStatus = $('#conn-status');
+    if (connStatus) {
+        connStatus.className = 'status connected';
+        connStatus.textContent = 'Connected';
+    }
+}
+
 function hideConnInfoBadge() {
     const badge = $('#conn-info-badge');
     if (badge) badge.classList.add('hidden');
@@ -460,19 +477,7 @@ function finishSsoConnect(result, p) {
         region: p.region, awsProfile: 'sso', envTag: p.envTag,
     });
 
-    state.connected = true;
-    config.region   = p.region;
-    config.profile  = 'sso';
-    config.endpoint = '';
-    config.envTag   = p.envTag;
-    showEnvBadge(p.envTag);
-    updateConnInfoBadge(p.region, '');
-
-    const connStatus = $('#conn-status');
-    if (connStatus) {
-        connStatus.className = 'status connected';
-        connStatus.textContent = 'Connected';
-    }
+    applyConnectedState({ region: p.region, profile: 'sso', envTag: p.envTag });
     if (result?.role?.roleArn) {
         document.dispatchEvent(new CustomEvent('roleAssumed', { detail: { roleArn: result.role.roleArn } }));
     }
@@ -587,16 +592,9 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
     }
 
     try {
-        await api('POST', '/connect', { region, profile, endpoint });
+        await api('POST', '/connect', { region, profile, endpoint, envTag });
         trackRecentConnection({ region, awsProfile: profile, endpoint, envTag });
-
-        state.connected  = true;
-        config.region    = region;
-        config.profile   = profile;
-        config.endpoint  = endpoint;
-        config.envTag    = envTag;
-        showEnvBadge(envTag);
-        updateConnInfoBadge(region, endpoint);
+        applyConnectedState({ region, profile, endpoint, envTag });
 
         const regionSel = $('#region-select');
         const profileInp = $('#profile-input');
@@ -604,12 +602,6 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
         if (regionSel) regionSel.value = region;
         if (profileInp) profileInp.value = profile;
         if (endpointInp) endpointInp.value = endpoint;
-
-        const connStatus = $('#conn-status');
-        if (connStatus) {
-            connStatus.className = 'status connected';
-            connStatus.textContent = 'Connected';
-        }
 
         showToast(`Connected to ${region}`, 'success');
         hideLogin();
@@ -632,22 +624,10 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
     }
 
     try {
-        const result = await api('POST', '/assume-role', { roleArn, sessionName, region, profile, endpoint: '' });
+        const result = await api('POST', '/assume-role', { roleArn, sessionName, region, profile, endpoint: '', envTag });
         trackRecentConnection({ roleArn, sessionName, region, awsProfile: profile, envTag });
         addRoleHistory({ roleArn, sessionName, region, awsProfile: profile, envTag });
-
-        state.connected = true;
-        config.region   = region;
-        config.profile  = profile;
-        config.envTag   = envTag;
-        showEnvBadge(envTag);
-        updateConnInfoBadge(region, '');
-
-        const connStatus = $('#conn-status');
-        if (connStatus) {
-            connStatus.className = 'status connected';
-            connStatus.textContent = 'Connected';
-        }
+        applyConnectedState({ region, profile, envTag });
         document.dispatchEvent(new CustomEvent('roleAssumed', { detail: { roleArn } }));
 
         // Start expiration countdown using the STS-issued expiration time

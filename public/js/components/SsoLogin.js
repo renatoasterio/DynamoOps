@@ -230,7 +230,7 @@ async function connectSelected() {
     if (ctx.resetPreviousSession) await ctx.resetPreviousSession();
 
     const result = await api('POST', '/sso/connect', {
-        sessionId: session.sessionId, accountId, roleName, accountName: account?.accountName || '', region, endpoint: '',
+        sessionId: session.sessionId, accountId, roleName, accountName: account?.accountName || '', region, endpoint: '', envTag,
     });
     rememberLast({ accountId, roleName });
 
