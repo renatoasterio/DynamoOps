@@ -1,6 +1,6 @@
 {
   "name": "dynamo-gui",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "author": "Renato Asterio",
   "license": "SEE LICENSE IN LICENSE",
   "description": "Visual GUI tool for AWS DynamoDB — query, insert, update & delete items",
@@ -34,7 +34,8 @@
           ]
         }
       ],
-      "icon": "assets/icons/icon.icns"
+      "icon": "assets/icons/icon.icns",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "dmg": {
       "title": "DynamoOps",
@@ -74,7 +75,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DynamoOps",
-      "installerHeaderIcon": "assets/icons/icon.ico"
+      "installerHeaderIcon": "assets/icons/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "files": [
       "server.js",
@@ -85,7 +87,10 @@
       "node_modules/**/*",
       "package.json"
     ],
-    "asar": true
+    "asar": true,
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.1020.0",
