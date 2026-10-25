@@ -76,6 +76,17 @@ describe('API security', () => {
         expect(res.headers['x-powered-by']).toBeUndefined();
     });
 
+    test('the CSP allows no external origin (fonts are self-hosted)', async () => {
+        const res = await request('/');
+        expect(res.headers['content-security-policy']).not.toMatch(/https?:/);
+    });
+
+    test('serves the self-hosted fonts', async () => {
+        const res = await request('/fonts/inter-latin-wght-normal.woff2');
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toMatch(/font\/woff2/);
+    });
+
     test('rejects invalid table names before reaching AWS', async () => {
         const res = await request('/api/tables/bad%20name!');
         expect(res.status).toBe(400);

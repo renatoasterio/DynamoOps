@@ -37,8 +37,8 @@ const CONTENT_SECURITY_POLICY = [
     "default-src 'self'",
     "script-src 'self'",
     // Inline style attributes are used throughout the rendered UI
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
     "img-src 'self' data: blob:",
     "connect-src 'self'",
     "object-src 'none'",
