@@ -19,6 +19,77 @@ const {
     BatchWriteCommand
 } = require('@aws-sdk/lib-dynamodb');
 const { unmarshall } = require('@aws-sdk/util-dynamodb');
+const { badRequest } = require('../middleware/errors');
+
+// BatchWriteItem accepts at most 25 requests per call
+const BATCH_WRITE_LIMIT = 25;
+// Retries for items DynamoDB returns as unprocessed (throttling)
+const BATCH_MAX_RETRIES = 3;
+const DEFAULT_PAGE_SIZE = 50;
+
+function chunk(list, size) {
+    const chunks = [];
+    for (let i = 0; i < list.length; i += size) chunks.push(list.slice(i, i + size));
+    return chunks;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function sumCapacityUnits(consumedCapacity = []) {
+    return consumedCapacity.reduce((sum, c) => sum + (c.CapacityUnits || 0), 0);
+}
+
+/** Shapes a Scan/Query response for the UI. */
+function toPage(result) {
+    return {
+        items: result.Items || [],
+        count: result.Count,
+        scannedCount: result.ScannedCount,
+        lastEvaluatedKey: result.LastEvaluatedKey || null,
+        consumedCapacity: result.ConsumedCapacity || null,
+    };
+}
+
+/** Key schema + attribute definitions for a table or GSI (sort key optional). */
+function buildKeySchema(pkName, pkType, skName, skType) {
+    if (!pkName || !pkType) throw badRequest('Partition key name and type are required');
+    const AttributeDefinitions = [{ AttributeName: pkName, AttributeType: pkType }];
+    const KeySchema = [{ AttributeName: pkName, KeyType: 'HASH' }];
+    if (skName && skType) {
+        AttributeDefinitions.push({ AttributeName: skName, AttributeType: skType });
+        KeySchema.push({ AttributeName: skName, KeyType: 'RANGE' });
+    }
+    return { AttributeDefinitions, KeySchema };
+}
+
+/**
+ * Sends PutRequest/DeleteRequest entries in batches of 25, retrying the
+ * unprocessed ones with exponential backoff.
+ * Returns { processedCount, unprocessed: [request], consumedCapacity }.
+ */
+async function writeInBatches(clients, tableName, requests) {
+    let processedCount = 0;
+    let unprocessed = [];
+    let capacityUnits = 0;
+
+    for (const batch of chunk(requests, BATCH_WRITE_LIMIT)) {
+        let pending = batch;
+        for (let attempt = 0; pending.length && attempt <= BATCH_MAX_RETRIES; attempt++) {
+            if (attempt > 0) await sleep(100 * 2 ** attempt);
+            const result = await clients.docClient.send(new BatchWriteCommand({
+                RequestItems: { [tableName]: pending },
+                ReturnConsumedCapacity: 'TOTAL',
+            }));
+            capacityUnits += sumCapacityUnits(result.ConsumedCapacity);
+            const left = result.UnprocessedItems?.[tableName] || [];
+            processedCount += pending.length - left.length;
+            pending = left;
+        }
+        unprocessed = unprocessed.concat(pending);
+    }
+
+    return { processedCount, unprocessed, consumedCapacity: { CapacityUnits: capacityUnits } };
+}
 
 class DynamoService {
 
@@ -48,10 +119,7 @@ class DynamoService {
     }
 
     async getTableDashboard(clients, tableName) {
-        const tableResult = await clients.dynamoClient.send(
-            new DescribeTableCommand({ TableName: tableName })
-        );
-        const t = tableResult.Table;
+        const t = await this.describeTable(clients, tableName);
 
         // CloudWatch: last 24 h, 1-hour granularity
         let cwMetrics = null;
@@ -135,27 +203,11 @@ class DynamoService {
     }
 
     async createTable(clients, { TableName, PartitionKeyName, PartitionKeyType, SortKeyName, SortKeyType }) {
-        if (!TableName || !PartitionKeyName || !PartitionKeyType) {
-            throw new Error('TableName, PartitionKeyName, and PartitionKeyType are required');
-        }
-
-        const AttributeDefinitions = [
-            { AttributeName: PartitionKeyName, AttributeType: PartitionKeyType }
-        ];
-        
-        const KeySchema = [
-            { AttributeName: PartitionKeyName, KeyType: 'HASH' }
-        ];
-
-        if (SortKeyName && SortKeyType) {
-            AttributeDefinitions.push({ AttributeName: SortKeyName, AttributeType: SortKeyType });
-            KeySchema.push({ AttributeName: SortKeyName, KeyType: 'RANGE' });
-        }
+        if (!TableName) throw badRequest('TableName is required');
 
         const params = {
             TableName,
-            AttributeDefinitions,
-            KeySchema,
+            ...buildKeySchema(PartitionKeyName, PartitionKeyType, SortKeyName, SortKeyType),
             BillingMode: 'PAY_PER_REQUEST',
         };
 
@@ -168,17 +220,8 @@ class DynamoService {
     }
 
     async createGsi(clients, tableName, { indexName, pkName, pkType, skName, skType, projection, nonKeyAttrs }) {
-        const AttributeDefinitions = [
-            { AttributeName: pkName, AttributeType: pkType }
-        ];
-        const KeySchema = [
-            { AttributeName: pkName, KeyType: 'HASH' }
-        ];
-
-        if (skName && skType) {
-            AttributeDefinitions.push({ AttributeName: skName, AttributeType: skType });
-            KeySchema.push({ AttributeName: skName, KeyType: 'RANGE' });
-        }
+        if (!indexName) throw badRequest('indexName is required');
+        const { AttributeDefinitions, KeySchema } = buildKeySchema(pkName, pkType, skName, skType);
 
         const Projection = { ProjectionType: projection || 'ALL' };
         if (projection === 'INCLUDE' && nonKeyAttrs?.length > 0) {
@@ -211,7 +254,7 @@ class DynamoService {
     async scan(clients, tableName, filters) {
         const params = {
             TableName: tableName,
-            Limit: filters.limit || 50,
+            Limit: filters.limit || DEFAULT_PAGE_SIZE,
         };
 
         if (filters.exclusiveStartKey) params.ExclusiveStartKey = filters.exclusiveStartKey;
@@ -222,21 +265,14 @@ class DynamoService {
         }
 
         params.ReturnConsumedCapacity = 'TOTAL';
-        const result = await clients.docClient.send(new DocScanCommand(params));
-        return {
-            items: result.Items || [],
-            count: result.Count,
-            scannedCount: result.ScannedCount,
-            lastEvaluatedKey: result.LastEvaluatedKey || null,
-            consumedCapacity: result.ConsumedCapacity || null,
-        };
+        return toPage(await clients.docClient.send(new DocScanCommand(params)));
     }
 
     async query(clients, tableName, filters) {
         const params = {
             TableName: tableName,
             KeyConditionExpression: filters.keyConditionExpression,
-            Limit: filters.limit || 50,
+            Limit: filters.limit || DEFAULT_PAGE_SIZE,
         };
 
         if (filters.expressionAttributeValues) params.ExpressionAttributeValues = filters.expressionAttributeValues;
@@ -247,14 +283,7 @@ class DynamoService {
         if (filters.scanIndexForward !== undefined) params.ScanIndexForward = filters.scanIndexForward;
 
         params.ReturnConsumedCapacity = 'TOTAL';
-        const result = await clients.docClient.send(new DocQueryCommand(params));
-        return {
-            items: result.Items || [],
-            count: result.Count,
-            scannedCount: result.ScannedCount,
-            lastEvaluatedKey: result.LastEvaluatedKey || null,
-            consumedCapacity: result.ConsumedCapacity || null,
-        };
+        return toPage(await clients.docClient.send(new DocQueryCommand(params)));
     }
 
     async executeStatement(clients, statement, nextToken) {
@@ -307,119 +336,36 @@ class DynamoService {
     }
 
     async batchWrite(clients, tableName, items) {
-        const chunkSize = 25;
-        const chunks = [];
-        for (let i = 0; i < items.length; i += chunkSize) {
-            chunks.push(items.slice(i, i + chunkSize));
-        }
-
-        let processedCount = 0;
-        let unprocessedItems = [];
-        let totalConsumedWCU = 0;
-
-        for (const chunk of chunks) {
-            const requestItems = chunk.map(item => ({
-                PutRequest: { Item: item }
-            }));
-
-            const params = {
-                RequestItems: { [tableName]: requestItems },
-                ReturnConsumedCapacity: 'TOTAL',
-            };
-
-            const result = await clients.docClient.send(new BatchWriteCommand(params));
-            processedCount += chunk.length;
-
-            if (result.ConsumedCapacity) {
-                totalConsumedWCU += result.ConsumedCapacity.reduce((s, c) => s + (c.CapacityUnits || 0), 0);
-            }
-            if (result.UnprocessedItems && result.UnprocessedItems[tableName]) {
-                 unprocessedItems = unprocessedItems.concat(result.UnprocessedItems[tableName]);
-                 processedCount -= result.UnprocessedItems[tableName].length;
-            }
-        }
-
-        return { processedCount, unprocessedItems, consumedCapacity: { CapacityUnits: totalConsumedWCU } };
+        const result = await writeInBatches(clients, tableName, items.map((Item) => ({ PutRequest: { Item } })));
+        return { ...result, unprocessed: result.unprocessed.map((r) => r.PutRequest.Item) };
     }
 
     async batchDelete(clients, tableName, keys) {
-        const chunkSize = 25;
-        const maxRetries = 3;
-        let deletedCount = 0;
-        let unprocessedKeys = [];
-        let totalConsumedWCU = 0;
-
-        for (let i = 0; i < keys.length; i += chunkSize) {
-            let requestItems = keys.slice(i, i + chunkSize).map(key => ({
-                DeleteRequest: { Key: key }
-            }));
-
-            // Retry unprocessed requests with exponential backoff (throttling)
-            for (let attempt = 0; requestItems.length && attempt <= maxRetries; attempt++) {
-                if (attempt > 0) await new Promise(r => setTimeout(r, 100 * 2 ** attempt));
-                const result = await clients.docClient.send(new BatchWriteCommand({
-                    RequestItems: { [tableName]: requestItems },
-                    ReturnConsumedCapacity: 'TOTAL',
-                }));
-                if (result.ConsumedCapacity) {
-                    totalConsumedWCU += result.ConsumedCapacity.reduce((s, c) => s + (c.CapacityUnits || 0), 0);
-                }
-                const unprocessed = result.UnprocessedItems?.[tableName] || [];
-                deletedCount += requestItems.length - unprocessed.length;
-                requestItems = unprocessed;
-            }
-            unprocessedKeys = unprocessedKeys.concat(requestItems.map(r => r.DeleteRequest.Key));
-        }
-
-        return { deletedCount, unprocessedKeys, consumedCapacity: { CapacityUnits: totalConsumedWCU } };
+        const result = await writeInBatches(clients, tableName, keys.map((Key) => ({ DeleteRequest: { Key } })));
+        return { ...result, unprocessed: result.unprocessed.map((r) => r.DeleteRequest.Key) };
     }
 
     async truncateTable(clients, tableName) {
-        const tableDescription = await clients.dynamoClient.send(new DescribeTableCommand({ TableName: tableName }));
-        const keySchema = tableDescription.Table.KeySchema;
-        const keyAttributeNames = keySchema.map(k => k.AttributeName);
+        const table = await this.describeTable(clients, tableName);
+        const keyNames = table.KeySchema.map((k) => k.AttributeName);
+        // Scan only the key attributes — that is all a DeleteRequest needs
+        const projection = {
+            ProjectionExpression: keyNames.map((_, i) => `#k${i}`).join(', '),
+            ExpressionAttributeNames: Object.fromEntries(keyNames.map((name, i) => [`#k${i}`, name])),
+        };
 
-        let totalDeleted = 0;
-        let lastEvaluatedKey = undefined;
-        const chunkSize = 25; 
-
+        let deletedCount = 0;
+        let lastEvaluatedKey;
         do {
-            const scanParams = {
-                TableName: tableName,
-                ProjectionExpression: keyAttributeNames.map((_, i) => `#k${i}`).join(', '),
-                ExpressionAttributeNames: keyAttributeNames.reduce((acc, name, i) => {
-                    acc[`#k${i}`] = name;
-                    return acc;
-                }, {}),
-                ExclusiveStartKey: lastEvaluatedKey
-            };
-
-            const scanResult = await clients.docClient.send(new DocScanCommand(scanParams));
-            const items = scanResult.Items || [];
-            lastEvaluatedKey = scanResult.LastEvaluatedKey;
-
-            if (items.length === 0) continue;
-
-            const chunks = [];
-            for (let i = 0; i < items.length; i += chunkSize) {
-                chunks.push(items.slice(i, i + chunkSize));
-            }
-
-            for (const chunk of chunks) {
-                const requestItems = chunk.map(item => ({
-                    DeleteRequest: { Key: item }
-                }));
-
-                const batchParams = {
-                    RequestItems: { [tableName]: requestItems }
-                };
-
-                const batchResult = await clients.docClient.send(new BatchWriteCommand(batchParams));
-                totalDeleted += chunk.length - (batchResult.UnprocessedItems?.[tableName]?.length || 0);
-            }
+            const page = await clients.docClient.send(new DocScanCommand({
+                TableName: tableName, ...projection, ExclusiveStartKey: lastEvaluatedKey,
+            }));
+            lastEvaluatedKey = page.LastEvaluatedKey;
+            const keys = page.Items || [];
+            if (keys.length) deletedCount += (await this.batchDelete(clients, tableName, keys)).processedCount;
         } while (lastEvaluatedKey);
 
-        return totalDeleted;
+        return deletedCount;
     }
 }
 

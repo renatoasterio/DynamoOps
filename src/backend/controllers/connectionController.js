@@ -2,69 +2,47 @@ const awsConfig = require('../config/aws');
 const { assumeRole } = require('../services/stsService');
 const dynamoService = require('../services/dynamoService');
 
-class ConnectionController {
-    getConfig(req, res) {
+const DEFAULT_CONFIG = { region: 'us-east-1', profile: 'default', endpoint: '' };
+
+module.exports = {
+    getConfig(_req, res) {
         res.json({
             ...awsConfig.currentConfig,
             assumedRole: awsConfig.assumedRoleInfo,
             connected: awsConfig.isConnected,
         });
-    }
+    },
 
     async connect(req, res) {
-        try {
-            const { region, profile, endpoint } = req.body;
-            const newConfig = {
-                region: region || 'us-east-1',
-                profile: profile || 'default',
-                endpoint: endpoint || '',
-            };
+        const { region, profile, endpoint } = req.body || {};
+        const newConfig = {
+            region: region || DEFAULT_CONFIG.region,
+            profile: profile || DEFAULT_CONFIG.profile,
+            endpoint: endpoint || DEFAULT_CONFIG.endpoint,
+        };
 
-            // Clear any previous assumed-role session so the middleware
-            // doesn't keep using stale STS credentials.
-            awsConfig.setAssumedRoleInfo(null);
-
-            // Still update global config for legacy reasons/initial state
-            awsConfig.setCurrentConfig(newConfig);
-            awsConfig.createClients(newConfig);
-
-            // Get clients for THIS specific config to test it
-            const clients = awsConfig.getCachedClients(newConfig);
-            const tableCount = await dynamoService.testConnection(clients);
-            awsConfig.setConnected(true);
-
-            res.json({ success: true, config: newConfig, tableCount });
-        } catch (err) {
-            res.status(500).json({ success: false, error: err.message });
-        }
-    }
-
-    disconnect(req, res) {
+        // Clear any previous assumed-role session so the middleware
+        // doesn't keep using stale STS credentials.
         awsConfig.setAssumedRoleInfo(null);
-        awsConfig.setCurrentConfig({ region: 'us-east-1', profile: 'default', endpoint: '' });
+        awsConfig.setCurrentConfig(newConfig);
+        awsConfig.createClients(newConfig);
+
+        const tableCount = await dynamoService.testConnection(awsConfig.activeClients());
+        awsConfig.setConnected(true);
+        res.json({ success: true, config: newConfig, tableCount });
+    },
+
+    disconnect(_req, res) {
+        awsConfig.setAssumedRoleInfo(null);
+        awsConfig.setCurrentConfig({ ...DEFAULT_CONFIG });
         awsConfig.setConnected(false);
         res.json({ success: true });
-    }
+    },
 
     async handleAssumeRole(req, res) {
-        try {
-            const result = await assumeRole(req.body);
-            const tableCount = await dynamoService.testConnection({
-                dynamoClient: awsConfig.dynamoClient,
-                docClient: awsConfig.docClient,
-            });
-            awsConfig.setConnected(true);
-
-            res.json({
-                success: true,
-                config: result.config,
-                role: result.role,
-                tableCount
-            });
-        } catch (err) {
-            res.status(500).json({ success: false, error: err.message });
-        }
-    }
-}
-
-module.exports = new ConnectionController();
+        const result = await assumeRole(req.body || {});
+        const tableCount = await dynamoService.testConnection(awsConfig.activeClients());
+        awsConfig.setConnected(true);
+        res.json({ success: true, config: result.config, role: result.role, tableCount });
+    },
+};

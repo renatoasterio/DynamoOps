@@ -96,6 +96,8 @@ module.exports = {
     get isConnected() { return isConnected; },
 
     getCachedClients,
+    /** Clients of the active session (assumed role / SSO / last connect). */
+    activeClients: () => globalClients,
 
     createClients: (config, explicitCredentials) => {
         globalConfig = config;
