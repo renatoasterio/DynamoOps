@@ -2,7 +2,7 @@
   "name": "dynamo-gui",
   "version": "2.1.0",
   "author": "Renato Asterio",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "SEE LICENSE IN LICENSE",
   "description": "Visual GUI tool for AWS DynamoDB — query, insert, update & delete items",
   "main": "electron-main.js",
   "scripts": {

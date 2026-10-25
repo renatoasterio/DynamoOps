@@ -4,7 +4,7 @@ GUI desktop para AWS DynamoDB com foco em alta produtividade.
 
 ## Licença do projeto
 
-Código aberto sob **PolyForm Noncommercial 1.0.0** (`LICENSE`): uso, cópia e modificação livres para fins não comerciais, com crédito obrigatório (linha `Required Notice`). Todas as features são gratuitas — não existe sistema de planos/licença no app.
+Licença **MIT + Commons Clause** + condição adicional (`LICENSE`): uso livre por qualquer pessoa ou empresa (inclusive uso interno), cópia e modificação com crédito (aviso de copyright); proibido vender ou embutir em produto/serviço pago. Todas as features são gratuitas — não existe sistema de planos/licença no app.
 
 ## Stack
 

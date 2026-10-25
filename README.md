@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
+  <img src="https://img.shields.io/badge/license-MIT%20%2B%20Commons%20Clause-blue" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-green?logo=node.js&logoColor=white" />
   <img src="https://img.shields.io/badge/electron-35.x-47848F?logo=electron&logoColor=white" />
@@ -170,10 +170,13 @@ Issues e pull requests são bem-vindos. Antes de abrir um PR, rode `npm test`.
 
 ## 📄 Licença
 
-DynamoOps é distribuído sob a **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+DynamoOps é distribuído sob a licença **[MIT + Commons Clause](LICENSE)**, com uma condição adicional contra embutir em produtos pagos.
 
-- ✅ Você pode usar, copiar, modificar e redistribuir para fins **não comerciais**: uso pessoal, estudo, pesquisa, projetos hobby e organizações sem fins lucrativos (instituições de ensino, ONGs, órgãos públicos).
-- ✅ Ao distribuir cópias ou versões modificadas, mantenha o arquivo `LICENSE` e a linha `Required Notice` com o crédito ao autor.
-- ❌ Uso comercial não é permitido sem autorização do autor — isso inclui vender ou embutir em produto/serviço pago **e** usar a ferramenta no trabalho de uma empresa com fins lucrativos.
+- ✅ Qualquer pessoa ou empresa pode usar gratuitamente — inclusive no trabalho, dentro de empresas com fins lucrativos.
+- ✅ Você pode copiar, modificar e redistribuir, mantendo o arquivo `LICENSE` com o aviso de copyright (o crédito ao autor).
+- ❌ Não é permitido vender o DynamoOps nem cobrar por produto ou serviço baseado nele (inclusive hospedagem, consultoria ou suporte pagos).
+- ❌ Não é permitido embutir o DynamoOps, total ou parcialmente, em produto ou serviço pago.
+
+Por causa dessas restrições, a licença é *source-available* (código aberto para uso) e não "open source" no sentido da [OSI](https://opensource.org/osd).
 
 Copyright (c) 2026 Renato Asterio.
