@@ -1,4 +1,5 @@
 import { $ } from '../utils/dom.js';
+import { loadString, saveString } from '../utils/storage.js';
 
 const STORAGE_KEY = 'dynamo-gui-theme';
 
@@ -6,14 +7,14 @@ export function initThemeManager() {
     const toggleBtn = $('#theme-toggle-btn');
     if (!toggleBtn) return;
 
-    const saved = localStorage.getItem(STORAGE_KEY) || 'dark';
+    const saved = loadString(STORAGE_KEY, 'dark');
     applyTheme(saved);
 
     toggleBtn.addEventListener('click', () => {
         const current = document.documentElement.getAttribute('data-theme') || 'dark';
         const next = current === 'dark' ? 'light' : 'dark';
         applyTheme(next);
-        localStorage.setItem(STORAGE_KEY, next);
+        saveString(STORAGE_KEY, next);
     });
 }
 

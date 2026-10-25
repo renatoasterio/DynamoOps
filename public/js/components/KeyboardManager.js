@@ -2,6 +2,7 @@ import { state } from '../state/store.js';
 import { closeTab, switchTab } from './TabManager.js';
 import { executeQuery } from './QueryPanel.js';
 import { $ } from '../utils/dom.js';
+import { setSidebarCollapsed, toggleSidebar } from './Sidebar.js';
 
 export function initKeyboardManager() {
     document.addEventListener('keydown', handleKeydown);
@@ -20,14 +21,6 @@ function handleKeydown(e) {
 
     const mod = e.metaKey || e.ctrlKey;
     if (!mod) return;
-
-    // Cmd/Ctrl+Shift+L — License window. Works everywhere (login screen too),
-    // even with focus inside an input.
-    if (e.shiftKey && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        window.licenseManager?.showLicenseModal();
-        return;
-    }
 
     const tag = document.activeElement?.tagName;
     // Allow Cmd+Enter inside textareas (SQL editor), block other shortcuts in inputs
@@ -80,8 +73,14 @@ function handleKeydown(e) {
             }
             break;
 
-        case 'k': { // Cmd+K — Focus sidebar table filter
+        case 'b': // Cmd+B — Collapse / expand sidebar
             e.preventDefault();
+            toggleSidebar();
+            break;
+
+        case 'k': { // Cmd+K — Focus sidebar table filter (expands it if collapsed)
+            e.preventDefault();
+            setSidebarCollapsed(false);
             const sidebarSearch = $('#table-search');
             if (sidebarSearch) { sidebarSearch.focus(); sidebarSearch.select(); }
             break;

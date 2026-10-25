@@ -3,6 +3,8 @@
 // errors, statement-kind pill (read vs write) and small editing helpers.
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
+import { escapeHtml } from '../utils/html.js';
+import { getPkSk } from '../utils/keySchema.js';
 
 // ─── Vocabulary ──────────────────────────────────────────────────────────────
 const KEYWORDS = new Set([
@@ -20,12 +22,6 @@ const LINE_CLAUSES = new Set(['FROM', 'WHERE', 'SET', 'REMOVE', 'VALUE', 'RETURN
 
 const TOKEN_RE = /(--[^\n]*)|('(?:[^'\\]|\\.)*'?)|("(?:[^"\\]|\\.)*"?)|(\b\d+(?:\.\d+)?\b)|(\b[A-Za-z_]\w*\b)|(<>|!=|>=|<=|[=<>])|([(){}\[\],.;*?:])|(\s+)|(.)/g;
 
-function esc(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    }[c]));
-}
-
 // ─── Statement kind ──────────────────────────────────────────────────────────
 /** @returns {{kind: 'read'|'write'|'unknown', verb: string}} */
 export function sqlStatementKind(sql) {
@@ -41,17 +37,17 @@ export function sqlStatementKind(sql) {
 export function highlightPartiQL(sql) {
     let out = '';
     String(sql || '').replace(TOKEN_RE, (m, comment, sq, dq, num, word, op) => {
-        if (comment)      out += `<span class="sql-tk-comment">${esc(m)}</span>`;
-        else if (sq)      out += `<span class="sql-tk-string">${esc(m)}</span>`;
-        else if (dq)      out += `<span class="sql-tk-ident">${esc(m)}</span>`;
-        else if (num)     out += `<span class="sql-tk-number">${esc(m)}</span>`;
+        if (comment)      out += `<span class="sql-tk-comment">${escapeHtml(m)}</span>`;
+        else if (sq)      out += `<span class="sql-tk-string">${escapeHtml(m)}</span>`;
+        else if (dq)      out += `<span class="sql-tk-ident">${escapeHtml(m)}</span>`;
+        else if (num)     out += `<span class="sql-tk-number">${escapeHtml(m)}</span>`;
         else if (word) {
-            if (FUNCTIONS.has(m.toLowerCase()))      out += `<span class="sql-tk-fn">${esc(m)}</span>`;
-            else if (KEYWORDS.has(m.toUpperCase()))  out += `<span class="sql-tk-kw">${esc(m)}</span>`;
-            else                                     out += esc(m);
+            if (FUNCTIONS.has(m.toLowerCase()))      out += `<span class="sql-tk-fn">${escapeHtml(m)}</span>`;
+            else if (KEYWORDS.has(m.toUpperCase()))  out += `<span class="sql-tk-kw">${escapeHtml(m)}</span>`;
+            else                                     out += escapeHtml(m);
         }
-        else if (op)      out += `<span class="sql-tk-op">${esc(m)}</span>`;
-        else              out += esc(m);
+        else if (op)      out += `<span class="sql-tk-op">${escapeHtml(m)}</span>`;
+        else              out += escapeHtml(m);
         return m;
     });
     return out;
@@ -110,9 +106,7 @@ export function formatPartiQL(sql) {
 // ─── Templates ───────────────────────────────────────────────────────────────
 export function buildSqlTemplates() {
     const t  = state.currentTable || 'table_name';
-    const ks = state.tableInfo?.KeySchema || [];
-    const pk = ks.find((k) => k.KeyType === 'HASH')?.AttributeName || 'pk';
-    const sk = ks.find((k) => k.KeyType === 'RANGE')?.AttributeName || null;
+    const { pk = 'pk', sk = null } = getPkSk(state.tableInfo?.KeySchema);
     const q  = (n) => `"${n}"`;
     const keyCond = `${q(pk)} = 'value'` + (sk ? `\n  AND ${q(sk)} = 'value'` : '');
 
@@ -128,8 +122,7 @@ export function buildSqlTemplates() {
     ];
 
     (state.tableInfo?.GlobalSecondaryIndexes || []).forEach((g) => {
-        const gpk = g.KeySchema?.find((k) => k.KeyType === 'HASH')?.AttributeName;
-        const gsk = g.KeySchema?.find((k) => k.KeyType === 'RANGE')?.AttributeName;
+        const { pk: gpk, sk: gsk } = getPkSk(g.KeySchema);
         if (!gpk) return;
         items.push({
             group: 'Index',
@@ -178,7 +171,7 @@ function updateKindPill() {
     pill.className = `sql-kind-pill sql-kind-${kind}`;
     pill.textContent = kind === 'write' ? `${verb} · writes data` : `${verb} · read`;
     pill.title = kind === 'write'
-        ? 'This statement modifies the table (Pro plan). You will be asked to confirm before it runs.'
+        ? 'This statement modifies the table. You will be asked to confirm before it runs.'
         : 'Read-only statement';
 }
 
@@ -218,7 +211,7 @@ function renderTemplatesMenu() {
         }
         const li = document.createElement('li');
         li.className = `sql-tpl-item${it.group === 'Write' ? ' sql-tpl-write' : ''}`;
-        li.innerHTML = `<span class="sql-tpl-label">${esc(it.label)}</span><code class="sql-tpl-preview">${esc(it.sql.split('\n')[0])}${it.sql.includes('\n') ? ' …' : ''}</code>`;
+        li.innerHTML = `<span class="sql-tpl-label">${escapeHtml(it.label)}</span><code class="sql-tpl-preview">${escapeHtml(it.sql.split('\n')[0])}${it.sql.includes('\n') ? ' …' : ''}</code>`;
         li.addEventListener('mousedown', (e) => {
             e.preventDefault();
             ui.ta.value = it.sql;

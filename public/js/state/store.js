@@ -30,3 +30,9 @@ export const config = {
     endpoint: '',
     envTag: 'none',
 };
+
+/** AWS connection of the active tab (falls back to the login connection). */
+export function getActiveTabConnection() {
+    const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+    return activeTab ? activeTab.connection : config;
+}

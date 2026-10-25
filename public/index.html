@@ -7,11 +7,7 @@
     <title>DynamoOps — Visual Database Manager</title>
     <meta name="description"
         content="Visual GUI tool for AWS DynamoDB — query, insert, update and delete items with a beautiful interface." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet" />
+    <link rel="stylesheet" href="fonts/fonts.css" />
     <link rel="stylesheet" href="styles.css" />
 </head>
 
@@ -259,9 +255,6 @@
                     <button id="login-submit-btn" class="btn-login-main">Connect to DynamoDB</button>
                 </div>
             </div>
-
-            <!-- Plan status + license entry point (filled by LicenseManager) -->
-            <div id="login-license-bar" class="login-license-bar hidden"></div>
         </div>
     </div>
 
@@ -313,11 +306,13 @@
     <div id="app-layout" class="hidden">
         <!-- Sidebar -->
         <aside id="sidebar">
+            <button id="sidebar-expand-btn" class="icon-btn sidebar-expand-btn" title="Expand sidebar (⌘B)">»</button>
             <div class="sidebar-header">
                 <h2>Tables</h2>
                 <div class="header-actions">
                     <button id="create-table-btn" class="icon-btn" title="Create new table">＋</button>
                     <button id="refresh-tables-btn" class="icon-btn" title="Refresh tables">↻</button>
+                    <button id="sidebar-collapse-btn" class="icon-btn" title="Collapse sidebar (⌘B)">«</button>
                 </div>
             </div>
             <input type="text" id="table-search" placeholder="Search tables…" />

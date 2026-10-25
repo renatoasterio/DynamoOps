@@ -1,6 +1,6 @@
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { showToast } from '../utils/toast.js';
+import { copyText } from '../utils/clipboard.js';
 
 export function initSchemaExporter() {
     const overlay   = $('#schema-export-overlay');
@@ -36,9 +36,7 @@ export function initSchemaExporter() {
     });
 
     copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(codeEl.textContent).then(() => {
-            showToast('Schema copied to clipboard', 'success');
-        });
+        copyText(codeEl.textContent, 'Schema copied to clipboard');
     });
 
     function setTab(fmt) {

@@ -1,128 +1,68 @@
 const dynamoService  = require('../services/dynamoService');
 const streamsService = require('../services/streamsService');
+const { requireString } = require('../middleware/validate');
 
-class TableController {
+// Handlers are wrapped with asyncHandler in routes/api.js: errors propagate
+// to the central error handler, so no try/catch here.
+
+module.exports = {
     async list(req, res) {
-        try {
-            const tables = await dynamoService.listTables(req.clients);
-            res.json({ tables });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        res.json({ tables: await dynamoService.listTables(req.clients) });
+    },
 
     async describe(req, res) {
-        try {
-            const table = await dynamoService.describeTable(req.clients, req.params.name);
-            res.json({ table });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        res.json({ table: await dynamoService.describeTable(req.clients, req.params.name) });
+    },
 
     async dashboard(req, res) {
-        try {
-            const data = await dynamoService.getTableDashboard(req.clients, req.params.name);
-            res.json(data);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        res.json(await dynamoService.getTableDashboard(req.clients, req.params.name));
+    },
 
     async create(req, res) {
-        try {
-            const tableDescription = await dynamoService.createTable(req.clients, req.body);
-            res.json({ success: true, table: tableDescription });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        const table = await dynamoService.createTable(req.clients, req.body || {});
+        res.json({ success: true, table });
+    },
 
     async delete(req, res) {
-        try {
-            await dynamoService.deleteTable(req.clients, req.params.name);
-            res.json({ success: true, message: 'Table deleted successfully' });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
-
-    async scan(req, res) {
-        try {
-            const result = await dynamoService.scan(req.clients, req.params.name, req.body);
-            res.json(result);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
-
-    async query(req, res) {
-        try {
-            const result = await dynamoService.query(req.clients, req.params.name, req.body);
-            res.json(result);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
-
-    async executeStatement(req, res) {
-        try {
-            const { statement, nextToken } = req.body;
-            if (!statement) return res.status(400).json({ error: 'Statement is required' });
-
-            const result = await dynamoService.executeStatement(req.clients, statement, nextToken);
-            res.json(result);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        await dynamoService.deleteTable(req.clients, req.params.name);
+        res.json({ success: true, message: 'Table deleted successfully' });
+    },
 
     async truncate(req, res) {
-        try {
-            const deletedCount = await dynamoService.truncateTable(req.clients, req.params.name);
-            res.json({ success: true, deletedCount, message: `Successfully deleted ${deletedCount} items.` });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        const deletedCount = await dynamoService.truncateTable(req.clients, req.params.name);
+        res.json({ success: true, deletedCount, message: `Successfully deleted ${deletedCount} items.` });
+    },
 
     async createGsi(req, res) {
-        try {
-            const tableDescription = await dynamoService.createGsi(req.clients, req.params.name, req.body);
-            res.json({ success: true, table: tableDescription });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        const table = await dynamoService.createGsi(req.clients, req.params.name, req.body || {});
+        res.json({ success: true, table });
+    },
 
     async deleteGsi(req, res) {
-        try {
-            const tableDescription = await dynamoService.deleteGsi(req.clients, req.params.name, req.params.gsiName);
-            res.json({ success: true, table: tableDescription });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        const table = await dynamoService.deleteGsi(req.clients, req.params.name, req.params.gsiName);
+        res.json({ success: true, table });
+    },
+
+    async scan(req, res) {
+        res.json(await dynamoService.scan(req.clients, req.params.name, req.body || {}));
+    },
+
+    async query(req, res) {
+        res.json(await dynamoService.query(req.clients, req.params.name, req.body || {}));
+    },
+
+    async executeStatement(req, res) {
+        const { statement, nextToken } = req.body || {};
+        requireString(statement, 'statement');
+        res.json(await dynamoService.executeStatement(req.clients, statement, nextToken));
+    },
 
     async getStreamStatus(req, res) {
-        try {
-            const status = await streamsService.getStreamStatus(req.clients, req.params.name);
-            res.json(status);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
+        res.json(await streamsService.getStreamStatus(req.clients, req.params.name));
+    },
 
     async getStreamRecords(req, res) {
-        try {
-            const { streamArn } = req.query;
-            if (!streamArn) return res.status(400).json({ error: 'streamArn query param required' });
-            const records = await streamsService.getRecentRecords(req.clients, streamArn);
-            res.json({ records });
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    }
-}
-
-module.exports = new TableController();
+        const streamArn = requireString(req.query.streamArn, 'streamArn');
+        res.json({ records: await streamsService.getRecentRecords(req.clients, streamArn) });
+    },
+};

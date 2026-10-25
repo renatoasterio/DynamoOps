@@ -4,18 +4,42 @@ import { state, config } from '../state/store.js';
 import { showToast } from '../utils/toast.js';
 import { openTab } from './TabManager.js';
 import { switchToAssumeRole } from './LoginManager.js';
+import { escapeHtml } from '../utils/html.js';
+import { loadString, saveString } from '../utils/storage.js';
 
 const dom = {
     tableSearch: $('#table-search'),
     tableList: $('#table-list'),
     refreshBtn: $('#refresh-tables-btn'),
+    sidebar: $('#sidebar'),
+    collapseBtn: $('#sidebar-collapse-btn'),
+    expandBtn: $('#sidebar-expand-btn'),
 };
+
+const COLLAPSED_KEY = 'dynamoops.sidebarCollapsed';
 
 export function initSidebar() {
     dom.tableSearch.addEventListener('input', (e) => renderTableList(e.target.value));
     dom.refreshBtn.addEventListener('click', loadTables);
 
+    // Collapse / expand — the collapsed state is remembered between sessions
+    setSidebarCollapsed(loadString(COLLAPSED_KEY) === '1');
+    if (!/Mac/i.test(navigator.platform || '')) {
+        [dom.collapseBtn, dom.expandBtn].forEach(btn => { if (btn) btn.title = btn.title.replace('⌘', 'Ctrl+'); });
+    }
+    dom.collapseBtn?.addEventListener('click', () => setSidebarCollapsed(true));
+    dom.expandBtn?.addEventListener('click', () => setSidebarCollapsed(false));
+
     document.addEventListener('tabChanged', () => renderTableList());
+}
+
+export function setSidebarCollapsed(collapsed) {
+    dom.sidebar.classList.toggle('collapsed', collapsed);
+    saveString(COLLAPSED_KEY, collapsed ? '1' : '0');
+}
+
+export function toggleSidebar() {
+    setSidebarCollapsed(!dom.sidebar.classList.contains('collapsed'));
 }
 
 export async function loadTables() {
@@ -48,16 +72,12 @@ function showAccessDeniedBanner(detail) {
       <li class="sidebar-auth-error">
         <div class="sae-icon">🔒</div>
         <div class="sae-title">Access denied</div>
-        <div class="sae-user">${escHtml(shortId)}</div>
+        <div class="sae-user">${escapeHtml(shortId)}</div>
         <div class="sae-desc">No permission for <code>dynamodb:ListTables</code>.<br>Use Assume Role to connect with a role that has access.</div>
         <button class="sae-btn" id="sae-assume-btn">Assume Role →</button>
       </li>`;
 
     $('#sae-assume-btn')?.addEventListener('click', () => switchToAssumeRole());
-}
-
-function escHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export function renderTableList(filter = '') {
@@ -71,7 +91,7 @@ export function renderTableList(filter = '') {
     }
 
     dom.tableList.innerHTML = filtered
-        .map((t) => `<li data-table="${t}" class="${t === state.currentTable ? 'active' : ''}">${t}</li>`)
+        .map((t) => `<li data-table="${escapeHtml(t)}" class="${t === state.currentTable ? 'active' : ''}">${escapeHtml(t)}</li>`)
         .join('');
 
     dom.tableList.querySelectorAll('li[data-table]').forEach((li) => {

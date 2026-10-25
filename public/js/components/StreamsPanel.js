@@ -1,8 +1,8 @@
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
-import { getActiveTabConnection } from './TabManager.js';
+import { escapeHtml } from '../utils/html.js';
 
 const MAX_RECORDS = 200;
 const POLL_INTERVAL_MS = 3000;
@@ -47,8 +47,7 @@ async function togglePanel() {
 
     // Check stream status
     try {
-        const conn = getActiveTabConnection();
-        const status = await api('GET', `/tables/${state.currentTable}/stream`, null, { connection: conn });
+        const status = await tableApi('GET', '/stream');
 
         if (!status.enabled) {
             showToast('Stream is not enabled for this table. Enable it in AWS Console → Table → Exports and streams.', 'warning');
@@ -101,10 +100,7 @@ async function poll() {
     if (!isOpen || isPaused || !streamArn) return;
 
     try {
-        const conn = getActiveTabConnection();
-        const data = await api('GET',
-            `/tables/${state.currentTable}/stream/records?streamArn=${encodeURIComponent(streamArn)}`,
-            null, { connection: conn });
+        const data = await tableApi('GET', `/stream/records?streamArn=${encodeURIComponent(streamArn)}`);
 
         if (data.records?.length > 0) {
             records = [...records, ...data.records].slice(-MAX_RECORDS);
@@ -157,7 +153,7 @@ function renderFeed() {
         if (r.eventName === 'MODIFY' && r.oldImage && r.newImage) {
             const diffs = diffSummary(r.oldImage, r.newImage);
             changeStr = diffs.length > 0
-                ? `<span class="stream-change">${diffs.slice(0, 3).join(' · ')}${diffs.length > 3 ? ` +${diffs.length - 3} more` : ''}</span>`
+                ? `<span class="stream-change">${escapeHtml(diffs.slice(0, 3).join(' · '))}${diffs.length > 3 ? ` +${diffs.length - 3} more` : ''}</span>`
                 : '';
         } else if (r.eventName === 'INSERT' && r.newImage) {
             const attrCount = Object.keys(r.newImage).length;
@@ -167,7 +163,7 @@ function renderFeed() {
         return `<div class="stream-record">
             <span class="stream-time">${time}</span>
             <span class="stream-op ${cfg.cls}">${cfg.label}</span>
-            <span class="stream-keys">${escHtml(keyStr)}</span>
+            <span class="stream-keys">${escapeHtml(keyStr)}</span>
             ${changeStr}
         </div>`;
     }).join('');
@@ -186,6 +182,3 @@ function diffSummary(oldObj, newObj) {
     return changes;
 }
 
-function escHtml(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

@@ -1,19 +1,15 @@
-import { $, $$ } from '../utils/dom.js';
+import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
-import { getActiveTabConnection } from './TabManager.js';
 import { saveVersion } from './VersionHistory.js';
-import { trackWrite } from './CostTracker.js';
+import { trackedWrite } from './CostTracker.js';
 import { getTemplate, buildTemplateFormHTML, buildItemFromForm } from './ItemTemplateManager.js';
+import { escapeHtml } from '../utils/html.js';
+import { getKeyNames, extractKey } from '../utils/keySchema.js';
 
 // form vs json mode for new-item modal
 let insertMode = 'json'; // 'form' | 'json'
-
-export function getKeyNames() {
-    if (!state.tableInfo || !state.tableInfo.KeySchema) return [];
-    return state.tableInfo.KeySchema.map(k => k.AttributeName);
-}
 
 const dom = {
     modalOverlay: $('#modal-overlay'),
@@ -100,14 +96,11 @@ export function initItemManager() {
         }
 
         try {
-            const connection = getActiveTabConnection();
             // Save version snapshot before overwriting (only for edits, not new inserts)
             if (state.editingItem) {
                 saveVersion(state.currentTable, state.editingItem);
             }
-            const _t0 = Date.now();
-            const putResult = await api('PUT', `/tables/${state.currentTable}/items`, { item }, { connection });
-            trackWrite(state.currentTable, putResult?.consumedCapacity, 'put', Date.now() - _t0, 1);
+            await trackedWrite(state.currentTable, 'put', 1, () => tableApi('PUT', '/items', { item }));
             showToast(state.editingItem ? 'Item updated successfully' : 'Item created successfully', 'success');
             closeItemModal();
             document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
@@ -116,8 +109,6 @@ export function initItemManager() {
             dom.editorError.classList.remove('hidden');
         }
     });
-
-    let deleteTarget = null;
 
     dom.deleteCloseBtn.addEventListener('click', closeDeleteModal);
     dom.deleteCancelBtn.addEventListener('click', closeDeleteModal);
@@ -129,15 +120,10 @@ export function initItemManager() {
         if (state.deletingTargets) return confirmBulkDelete();
         if (!state.deletingTarget) return;
 
-        const keyNames = getKeyNames();
-        const key = {};
-        keyNames.forEach((k) => (key[k] = state.deletingTarget[k]));
+        const key = extractKey(state.deletingTarget);
 
         try {
-            const connection = getActiveTabConnection();
-            const _t0 = Date.now();
-            const delResult = await api('DELETE', `/tables/${state.currentTable}/items`, { key }, { connection });
-            trackWrite(state.currentTable, delResult?.consumedCapacity, 'delete', Date.now() - _t0, 1);
+            await trackedWrite(state.currentTable, 'delete', 1, () => tableApi('DELETE', '/items', { key }));
             showToast('Item deleted', 'success');
             closeDeleteModal();
             document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
@@ -186,8 +172,7 @@ function refreshNewItemView() {
     if (toggle) toggle.textContent = insertMode === 'form' ? '{ } JSON' : '📋 Form';
 
     if (insertMode === 'form' && tpl) {
-        const keyNames = getKeyNames();
-        dom.editorInfo.innerHTML = `Template: <strong>${state.currentTable}</strong> · ${tpl.length} fields`;
+        dom.editorInfo.innerHTML = `Template: <strong>${escapeHtml(state.currentTable)}</strong> · ${tpl.length} fields`;
         _showFormEditor(tpl);
     } else {
         const keyNames = getKeyNames();
@@ -198,7 +183,7 @@ function refreshNewItemView() {
         } else {
             keyNames.forEach(k => { seed[k] = ''; });
         }
-        dom.editorInfo.innerHTML = `Required keys: <strong>${keyNames.join(', ')}</strong>`;
+        dom.editorInfo.innerHTML = `Required keys: <strong>${escapeHtml(keyNames.join(', '))}</strong>`;
         dom.itemEditor.value = JSON.stringify(seed, null, 2);
         _showJsonEditor();
     }
@@ -250,7 +235,7 @@ const BULK_PREVIEW_LIMIT = 50;
 export function openBulkDeleteModal(items) {
     state.deletingTarget = null;
     state.deletingTargets = items;
-    const keys = items.map(itemKey);
+    const keys = items.map((item) => extractKey(item));
     const n = items.length;
     dom.deleteTitle.textContent = `Delete ${n} Item${n > 1 ? 's' : ''}`;
     dom.deleteMessage.textContent = `Are you sure you want to delete ${n} item${n > 1 ? 's' : ''}? This action cannot be undone.`;
@@ -261,21 +246,13 @@ export function openBulkDeleteModal(items) {
     dom.deleteOverlay.classList.remove('hidden');
 }
 
-function itemKey(item) {
-    const key = {};
-    getKeyNames().forEach((k) => (key[k] = item[k]));
-    return key;
-}
-
 async function confirmBulkDelete() {
-    const keys = state.deletingTargets.map(itemKey);
+    const keys = state.deletingTargets.map((item) => extractKey(item));
     dom.deleteConfirmBtn.disabled = true;
     dom.deleteConfirmBtn.textContent = 'Deleting…';
     try {
-        const connection = getActiveTabConnection();
-        const _t0 = Date.now();
-        const result = await api('POST', `/tables/${state.currentTable}/batch-delete`, { keys }, { connection });
-        trackWrite(state.currentTable, result?.consumedCapacity, 'batchDelete', Date.now() - _t0, result.deletedCount);
+        const result = await trackedWrite(state.currentTable, 'batchDelete', (r) => r.deletedCount,
+            () => tableApi('POST', '/batch-delete', { keys }));
         if (result.unprocessedKeysCount > 0) {
             showToast(`${result.deletedCount} deleted, ${result.unprocessedKeysCount} not processed (throttled) — try again`, 'error');
         } else {

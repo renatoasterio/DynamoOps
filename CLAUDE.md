@@ -2,22 +2,15 @@
 
 GUI desktop para AWS DynamoDB com foco em alta produtividade.
 
-## Branches
+## Licença do projeto
 
-| Branch | Descrição |
-|--------|-----------|
-| `feat/license-system` | **Versão paga** — controle de licença JWT (ES256), planos Free/Pro/Pro+, validação offline, Stripe subscription |
-| `feature/no-license` | **Versão sem licença** — todas as features liberadas, sem controle de plano |
-| `main` | Base de desenvolvimento |
-
-> A branch atual (`feat/license-system`) é a versão comercial com sistema de licença.
+Código aberto sob **PolyForm Noncommercial 1.0.0** (`LICENSE`): uso, cópia e modificação livres para fins não comerciais, com crédito obrigatório (linha `Required Notice`). Todas as features são gratuitas — não existe sistema de planos/licença no app.
 
 ## Stack
 
 - **Electron** + **Express** (port 3457) + **vanilla JS** (ES modules)
-- `electron-main.js` — janela principal, menu, IPC para licença
+- `electron-main.js` — janela principal, menu, carrega o Express
 - `server.js` — inicia o Express
-- `preload.js` — contextBridge (licenseStatus, licenseActivate, licenseDeactivate)
 
 ## Estrutura
 
@@ -25,21 +18,28 @@ GUI desktop para AWS DynamoDB com foco em alta produtividade.
 src/backend/
   config/aws.js          — AWS clients, cache, assumed role state
   controllers/           — connectionController, tableController
+  config/server.js       — HOST 127.0.0.1 + porta (nunca escutar em 0.0.0.0)
   middleware/
     connection.js        — injeta req.clients por request (ou usa assumed role global)
-    license.js           — requirePlan('pro') middleware (402 se plano insuficiente)
+    security.js          — localOnly (Host/Origin) + headers (CSP…)
+    errors.js            — asyncHandler + errorHandler (erros AWS → status HTTP)
+    validate.js          — router.param de nomes + requireString/Object/Array
   services/
     dynamoService.js     — scan, query, CRUD, truncate, streams
     stsService.js        — AssumeRole STS
-    licenseService.js    — JWT verify, grace period, refresh online
+    ssoService.js        — login AWS SSO (IAM Identity Center)
   routes/api.js          — todas as rotas Express
 
 public/
   index.html             — SPA completa
   styles.css             — tema dark, CSS variables
   js/
-    state/store.js       — state global + config de conexão
-    api/apiClient.js     — fetch wrapper com headers de conexão
+    state/store.js       — state global + config de conexão + getActiveTabConnection()
+    api/apiClient.js     — api(), tableApi() e connectedApi(): use tableApi para /tables/<t>/…
+    utils/               — html.js (escapeHtml), keySchema, storage, format, dynamoJson, clipboard, download, toast
+    codegen/             — geradores puros (sem DOM): languages/<lang>.js exporta { id, label, query, crud, sdk };
+                           index.js = registry; expressions.js = encoders de literal (dq, sq, shellQuote…)
+  fonts/                 — Inter + JetBrains Mono locais (a CSP não permite origens externas)
     components/
       LoginManager.js    — login, assume role, profiles, env picker
       TabManager.js      — multi-tab com state isolado por tab
@@ -47,7 +47,6 @@ public/
       QueryPanel.js      — scan/query/SQL, filtros, paginação
       ChartView.js       — timeline/distribuição/heatmap (SVG puro)
       Sidebar.js         — lista de tabelas
-      LicenseManager.js  — UI de ativação, _applyPlanToUI()
       SchemaExporter.js  — export CF/Terraform/CDK
 ```
 
@@ -58,13 +57,14 @@ public/
 - `/disconnect` reseta assumedRoleInfo + currentConfig no backend
 - `resetPreviousSession()` (LoginManager): limpa tudo antes de nova conexão
 
-## Licença (branch feat/license-system)
+## Convenções
 
-- JWT ECDSA P-256 com chave pública embarcada em `licenseService.js`
-- Validação offline: JWT válido → plano ativo; expirado → grace period 7 dias → free
-- Refresh online: POST /api/license/refresh (30 dias tolerância)
-- UI: `_applyPlanToUI()` esconde botões por plano; middleware retorna 402
-- Chaves separadas: dev (.env) vs production (.env.production)
+- Controllers não têm try/catch: lançam (`badRequest`, erros da AWS) e o `errorHandler` responde.
+- Toda interpolação de dado em `innerHTML`/atributos passa por `escapeHtml` — dados do DynamoDB não são confiáveis.
+- Chamadas de tabela usam `tableApi(...)` (conexão da aba ativa + nome codificado); escritas medidas com `trackedWrite(...)`.
+- `localStorage` só via `utils/storage.js` (nunca lança).
+- Geradores: todo valor vindo do usuário passa por um encoder de `codegen/expressions.js`; nova linguagem = novo módulo em `codegen/languages/` registrado no `index.js`.
+- `npm test` (Jest com ESM: `tests/*.test.mjs` importam `public/js`) e `npm run lint` precisam passar.
 
 ## Build
 

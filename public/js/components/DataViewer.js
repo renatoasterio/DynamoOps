@@ -1,9 +1,14 @@
 import { $, $$ } from '../utils/dom.js';
-import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { state, getActiveTabConnection } from '../state/store.js';
+import { api, tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
-import { getActiveTabConnection } from './TabManager.js';
-import { trackWrite } from './CostTracker.js';
+import { trackedWrite } from './CostTracker.js';
+import { escapeHtml } from '../utils/html.js';
+import { getPkSk, getKeyNames, extractKey } from '../utils/keySchema.js';
+import { copyText } from '../utils/clipboard.js';
+import { downloadBlob } from '../utils/download.js';
+import { loadString, saveString } from '../utils/storage.js';
+import { toDynamoJson } from '../utils/dynamoJson.js';
 
 const dom = {
     dataViewer: $('#data-viewer'),
@@ -38,13 +43,22 @@ let dragSrcIdx = null;
 let colWidths  = {};
 // lastSorted: shallow copy of current sorted items (updated each renderTableView)
 let lastSorted = [];
+// Horizontal padding of a data cell (#data-table td) — text width = column width minus this
+const CELL_PADDING_X = 28;
+
+// Resized columns: cap the cell text at the column width instead of the default 300px
+function cellValueStyle(col) {
+    return colWidths[col] ? ` style="max-width:${colWidths[col] - CELL_PADDING_X}px"` : '';
+}
+
 // Multi-row selection — ids are the JSON of the item's key values
 let selectedKeys   = new Set();
 let selectionTable = null;
 let lastCheckedIdx = null;
 // JSON view format: 'plain' (native values) | 'dynamo' (typed AttributeValues)
+const JSON_FORMAT_KEY = 'dynamoops.jsonFormat';
 let jsonFormat = 'plain';
-try { if (localStorage.getItem('dynamoops.jsonFormat') === 'dynamo') jsonFormat = 'dynamo'; } catch { /* storage unavailable */ }
+if (loadString(JSON_FORMAT_KEY) === 'dynamo') jsonFormat = 'dynamo';
 
 export function initDataViewer() {
     if (dom.viewTableBtn) {
@@ -95,7 +109,7 @@ export function initDataViewer() {
     document.addEventListener('reloadTableInfoRequest', async () => {
         if (!state.currentTable) return;
         try {
-            const { table } = await api('GET', `/tables/${state.currentTable}`);
+            const { table } = await tableApi('GET');
             state.tableInfo = table;
             renderTableInfo(table);
             // Update active tab cache
@@ -140,7 +154,7 @@ export function initDataViewer() {
         btn.classList.toggle('active', btn.dataset.format === jsonFormat);
         btn.addEventListener('click', () => {
             jsonFormat = btn.dataset.format;
-            try { localStorage.setItem('dynamoops.jsonFormat', jsonFormat); } catch { /* storage unavailable */ }
+            saveString(JSON_FORMAT_KEY, jsonFormat);
             formatToggle.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b === btn));
             document.dispatchEvent(new CustomEvent('renderDataRequest'));
         });
@@ -178,34 +192,6 @@ export function resetDataViewer() {
     if (ri) ri.textContent = '';
 }
 
-export async function selectTable(name) {
-    state.currentTable = name;
-    state.items = [];
-    state.allColumns = [];
-    state.lastEvaluatedKey = null;
-    colWidths = {};
-
-    dom.welcomeState.classList.add('hidden');
-    dom.emptyState.classList.add('hidden');
-    dom.dataViewer.classList.add('hidden');
-    dom.loadingState.classList.remove('hidden');
-    dom.tableInfoBar.classList.remove('hidden');
-    dom.toolbar.classList.remove('hidden');
-    dom.tableName.textContent = name;
-
-    try {
-        const { table } = await api('GET', `/tables/${name}`);
-        state.tableInfo = table;
-        renderTableInfo(table);
-        
-        document.dispatchEvent(new CustomEvent('populateQueryFieldsRequest', { detail: { table } }));
-        document.dispatchEvent(new CustomEvent('executeQueryRequest', { detail: { isNextPage: false } }));
-    } catch (err) {
-        showToast(`Error: ${err.message}`, 'error');
-        dom.loadingState.classList.add('hidden');
-    }
-}
-
 function renderTableInfo(table) {
     dom.tableName.textContent = table.TableName || state.currentTable || '';
     const keySchema = table.KeySchema || [];
@@ -218,23 +204,21 @@ function renderTableInfo(table) {
         const attrDef = attrDefs.find((a) => a.AttributeName === k.AttributeName);
         const type = attrDef ? attrDef.AttributeType : '?';
         const keyLabel = k.KeyType === 'HASH' ? 'PK' : 'SK';
-        return `<span class="schema-tag"><span class="key-type">${keyLabel}</span>${k.AttributeName} <span style="color:var(--text-muted)">(${type})</span></span>`;
+        return `<span class="schema-tag"><span class="key-type">${keyLabel}</span>${escapeHtml(k.AttributeName)} <span style="color:var(--text-muted)">(${escapeHtml(type)})</span></span>`;
     });
 
     const gsis = table.GlobalSecondaryIndexes || [];
-    // Index management is a Pro+ feature; without a license manager (no-license build) everything is allowed.
-    const canManageIndexes = window.licenseManager?.hasPlan?.('pro_plus') ?? true;
     gsis.forEach((gsi) => {
-        const gsiPk = gsi.KeySchema?.find(k => k.KeyType === 'HASH')?.AttributeName || '';
-        const gsiSk = gsi.KeySchema?.find(k => k.KeyType === 'RANGE')?.AttributeName;
+        const { pk: gsiPk = '', sk: gsiSk } = getPkSk(gsi.KeySchema);
         const status = gsi.IndexStatus || 'ACTIVE';
         const statusClass = status === 'ACTIVE' ? '' : ' gsi-creating';
         const keyInfo = gsiSk ? `${gsiPk} / ${gsiSk}` : gsiPk;
-        tags.push(`<span class="schema-tag gsi-tag${statusClass}" title="GSI: ${gsi.IndexName} | Keys: ${keyInfo} | Projection: ${gsi.Projection?.ProjectionType || 'ALL'}">
-            <span class="key-type">GSI</span>${gsi.IndexName}
-            <span class="gsi-keys">${keyInfo}</span>
-            ${status !== 'ACTIVE' ? `<span class="gsi-status">${status}</span>` : ''}
-            ${canManageIndexes ? `<button class="gsi-delete-btn" data-gsi="${gsi.IndexName}" title="Delete GSI">✕</button>` : ''}
+        const indexName = escapeHtml(gsi.IndexName);
+        tags.push(`<span class="schema-tag gsi-tag${statusClass}" title="GSI: ${indexName} | Keys: ${escapeHtml(keyInfo)} | Projection: ${escapeHtml(gsi.Projection?.ProjectionType || 'ALL')}">
+            <span class="key-type">GSI</span>${indexName}
+            <span class="gsi-keys">${escapeHtml(keyInfo)}</span>
+            ${status !== 'ACTIVE' ? `<span class="gsi-status">${escapeHtml(status)}</span>` : ''}
+            <button class="gsi-delete-btn" data-gsi="${indexName}" title="Delete GSI">✕</button>
         </span>`);
     });
 
@@ -312,10 +296,10 @@ function renderTableView(items = state.items) {
             sortIcon = '<span class="sort-arrow sort-idle">⇅</span>';
         }
         const w = colWidths[col] ? ` style="width:${colWidths[col]}px;min-width:${colWidths[col]}px"` : ' style="min-width:120px"';
-        thead += `<th class="${isKey ? 'key-col' : ''} col-sortable" draggable="true" data-col="${col}" data-col-idx="${colIdx}"${w}>`
+        thead += `<th class="${isKey ? 'key-col' : ''} col-sortable" draggable="true" data-col="${escapeHtml(col)}" data-col-idx="${colIdx}"${w}>`
             + `<span class="th-content">${escapeHtml(col)}${sortIcon}</span>`
             + `<span class="drag-handle" title="Drag to reorder">⠿</span>`
-            + `<span class="col-resize-handle" data-col="${col}"></span>`
+            + `<span class="col-resize-handle" data-col="${escapeHtml(col)}"></span>`
             + `</th>`;
     });
     thead += '</tr>';
@@ -393,6 +377,8 @@ function renderTableView(items = state.items) {
             const startX   = e.clientX;
             const startW   = th.getBoundingClientRect().width;
 
+            const columnCells = dom.dataTbody.querySelectorAll(`.cell-data[data-col="${CSS.escape(col)}"] .cell-value`);
+
             th.classList.add('col-resizing');
             table?.classList.add('is-resizing');
 
@@ -401,6 +387,7 @@ function renderTableView(items = state.items) {
                 th.style.width    = `${newW}px`;
                 th.style.minWidth = `${newW}px`;
                 colWidths[col] = newW;
+                columnCells.forEach(el => { el.style.maxWidth = `${newW - CELL_PADDING_X}px`; });
             };
 
             const onUp = () => {
@@ -432,7 +419,7 @@ function renderTableView(items = state.items) {
             const display = val === undefined ? '' : formatCellValue(val);
             const isKey = keyNames.includes(col);
             const titleVal = escapeHtml(JSON.stringify(val) ?? '');
-            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${col}" title="${titleVal}"><div class="cell-value">${display}</div></td>`;
+            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${escapeHtml(col)}" title="${titleVal}"><div class="cell-value"${cellValueStyle(col)}>${display}</div></td>`;
         });
         tbody += '</tr>';
     });
@@ -446,9 +433,7 @@ function renderTableView(items = state.items) {
     dom.dataTbody.querySelectorAll('.row-action-btn.copy').forEach((btn) => {
         btn.addEventListener('click', () => {
             const item = sorted[btn.dataset.idx];
-            navigator.clipboard.writeText(JSON.stringify(item, null, 2))
-                .then(() => showToast('JSON copied to clipboard', 'success'))
-                .catch(() => showToast('Failed to copy JSON', 'error'));
+            copyText(JSON.stringify(item, null, 2), 'JSON copied to clipboard');
         });
     });
     dom.dataTbody.querySelectorAll('.row-action-btn.history').forEach((btn) => {
@@ -534,7 +519,7 @@ function renderJsonView(items = state.items) {
     }
 
     // Edit / clone / delete always work on the native item; only display & copy follow the format
-    const displayItems = jsonFormat === 'dynamo' ? items.map(toDynamoJson) : items;
+    const displayItems = jsonFormat === 'dynamo' ? items.map((item) => toDynamoJson(item)) : items;
 
     let html = '';
     displayItems.forEach((item, index) => {
@@ -567,9 +552,7 @@ function renderJsonView(items = state.items) {
             const idx = e.currentTarget.closest('.json-record-compass').dataset.idx;
             const item = displayItems[idx];
             if (item) {
-                navigator.clipboard.writeText(JSON.stringify(item, null, 2))
-                    .then(() => showToast('Record copied to clipboard', 'success'))
-                    .catch(() => showToast('Failed to copy record', 'error'));
+                copyText(JSON.stringify(item, null, 2), 'Record copied to clipboard');
             }
         });
     });
@@ -580,21 +563,6 @@ function renderJsonView(items = state.items) {
             document.dispatchEvent(new CustomEvent('openDeleteModalRequest', { detail: { item: items[idx] } }));
         });
     });
-}
-
-// Native item → DynamoDB JSON (top-level attribute map of typed AttributeValues)
-export function toDynamoJson(item) {
-    return Object.fromEntries(Object.entries(item).map(([k, v]) => [k, toAttributeValue(v)]));
-}
-
-function toAttributeValue(value) {
-    if (value === null || value === undefined) return { NULL: true };
-    if (typeof value === 'string') return { S: value };
-    if (typeof value === 'number') return { N: String(value) };
-    if (typeof value === 'boolean') return { BOOL: value };
-    if (Array.isArray(value)) return { L: value.map(toAttributeValue) };
-    if (typeof value === 'object') return { M: toDynamoJson(value) };
-    return { S: String(value) };
 }
 
 function buildCompassJson(data, isRoot = false, isLast = true, keyName = null) {
@@ -726,7 +694,7 @@ function openExportModal(format) {
         const isKey = keyNames.includes(col);
         return `
             <label class="export-field-item">
-                <input type="checkbox" class="export-field-cb" data-field="${col}" checked />
+                <input type="checkbox" class="export-field-cb" data-field="${escapeHtml(col)}" checked />
                 <span class="export-field-name">${escapeHtml(col)}</span>
                 ${isKey ? `<span class="export-field-badge">key</span>` : ''}
             </label>`;
@@ -841,33 +809,12 @@ function doExportCsv(fields, items) {
     showToast(`Exported ${src.length} items (${fields.length} fields) as CSV`, 'success');
 }
 
-function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href     = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function getKeyNames() {
-    if (!state.tableInfo) return [];
-    return (state.tableInfo.KeySchema || []).map((k) => k.AttributeName);
-}
-
 function formatCellValue(val) {
     if (val === null) return '<span style="color:var(--text-muted);font-style:italic">null</span>';
     if (typeof val === 'object') return escapeHtml(JSON.stringify(val));
     if (typeof val === 'boolean') return `<span style="color:var(--info)">${val}</span>`;
     if (typeof val === 'number') return `<span style="color:var(--warning)">${val}</span>`;
     return escapeHtml(String(val));
-}
-
-function escapeHtml(s) {
-    if (s === undefined || s === null) return '';
-    const div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
 }
 
 // ─── Inline cell editing ──────────────────────────────────────────────────────
@@ -972,22 +919,18 @@ async function _applyInlineEdit(td, col, itemIdx, origVal, rawStr, origDisplay) 
     td.innerHTML = '<span class="cell-saving">saving…</span>';
 
     // Build the primary key object from the current item
-    const keyNames = getKeyNames();
-    const key = {};
-    for (const k of keyNames) key[k] = currentItem[k];
+    const key = extractKey(currentItem);
 
     try {
-        const connection = getActiveTabConnection();
-        const _t0 = Date.now();
-        const result = await api('PATCH', `/tables/${state.currentTable}/items`, { key, attributeName: col, newValue: newVal }, { connection });
-        trackWrite(state.currentTable, result?.consumedCapacity, 'update', Date.now() - _t0, 1);
+        await trackedWrite(state.currentTable, 'update', 1,
+            () => tableApi('PATCH', '/items', { key, attributeName: col, newValue: newVal }));
 
         // Update in-memory state
         const realIdx = state.items.indexOf(currentItem);
         if (realIdx !== -1) state.items[realIdx] = updatedItem;
         lastSorted[itemIdx] = updatedItem;
 
-        td.innerHTML = `<div class="cell-value">${newVal === undefined ? '' : formatCellValue(newVal)}</div>`;
+        td.innerHTML = `<div class="cell-value"${cellValueStyle(col)}>${newVal === undefined ? '' : formatCellValue(newVal)}</div>`;
         td.title     = escapeHtml(JSON.stringify(newVal) ?? '');
         showToast(`"${col}" updated`, 'success');
     } catch (err) {

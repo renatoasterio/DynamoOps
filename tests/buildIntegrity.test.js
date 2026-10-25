@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
+const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 describe('Build integrity', () => {
     // ── Critical files exist ─────────────────────────────────────────────────
@@ -11,16 +12,12 @@ describe('Build integrity', () => {
     describe('required files exist', () => {
         const required = [
             'electron-main.js',
-            'preload.js',
             'server.js',
             'package.json',
-            '.env.production',
+            'LICENSE',
             'public/index.html',
             'public/styles.css',
             'public/js/app.js',
-            'public/js/components/LicenseManager.js',
-            'src/backend/services/licenseService.js',
-            'src/backend/middleware/license.js',
             'src/backend/controllers/connectionController.js',
             'src/backend/config/aws.js',
             'scripts/build-prod.js',
@@ -36,138 +33,42 @@ describe('Build integrity', () => {
     // ── Build script copies all critical files ───────────────────────────────
 
     describe('build-prod.js configuration', () => {
-        const buildScript = fs.readFileSync(path.join(ROOT, 'scripts/build-prod.js'), 'utf8');
+        const buildScript = read('scripts/build-prod.js');
 
-        test('copies preload.js to staging', () => {
-            expect(buildScript).toContain("'preload.js'");
-        });
-
-        test('copies .env.production to staging', () => {
-            expect(buildScript).toContain("'.env.production'");
-        });
-
-        test('copies electron-main.js to staging', () => {
+        test('copies server.js and electron-main.js to staging', () => {
+            expect(buildScript).toContain("'server.js'");
             expect(buildScript).toContain("'electron-main.js'");
         });
 
-        test('disableConsoleOutput is true', () => {
-            expect(buildScript).toContain('disableConsoleOutput: true');
+        test('bundles the frontend with esbuild', () => {
+            expect(buildScript).toContain('esbuild.buildSync');
         });
     });
 
-    // ── package.json electron-builder files array ────────────────────────────
-
     describe('package.json build config', () => {
-        const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-        const files = pkg.build?.files || [];
+        const pkg = JSON.parse(read('package.json'));
 
-        test('includes preload.js', () => {
-            expect(files).toContain('preload.js');
-        });
-
-        test('includes .env.production', () => {
-            expect(files).toContain('.env.production');
-        });
-
-        test('includes server.js', () => {
-            expect(files).toContain('server.js');
-        });
-
-        test('includes electron-main.js', () => {
-            expect(files).toContain('electron-main.js');
+        test('includes server.js and electron-main.js', () => {
+            expect(pkg.build.files).toContain('server.js');
+            expect(pkg.build.files).toContain('electron-main.js');
         });
 
         test('has productName DynamoOps', () => {
             expect(pkg.build.productName).toBe('DynamoOps');
         });
-    });
 
-    // ── electron-main.js loads env file ──────────────────────────────────────
-
-    describe('electron-main.js', () => {
-        const mainJs = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
-
-        test('loads .env.production in prod', () => {
-            expect(mainJs).toContain(".env.production");
-        });
-
-        test('has preload.js reference', () => {
-            expect(mainJs).toContain("preload.js");
-        });
-
-        test('has license IPC handlers', () => {
-            expect(mainJs).toContain("license:status");
-            expect(mainJs).toContain("license:activate");
-            expect(mainJs).toContain("license:deactivate");
-        });
-
-        test('delegates activation/deactivation to licenseService (single server URL source)', () => {
-            const svc = fs.readFileSync(path.join(ROOT, 'src/backend/services/licenseService.js'), 'utf8');
-            expect(svc).toContain('process.env.LICENSE_SERVER_URL');
-            expect(svc).toContain("'https://dynamoops.io'"); // fallback default
-            expect(svc).toContain('/api/license/activate');
-            expect(mainJs).toContain('licenseService.activateLicense(');
-            expect(mainJs).toContain('licenseService.deactivateWithServer(');
-            expect(mainJs).toContain('licenseService.getLicenseServerUrl()');
-            expect(mainJs).not.toContain('https://dynamoops.io/api'); // no duplicated URLs
-            expect(mainJs).not.toContain('machineIdSync');            // machine id computed in one place
-        });
-
-        test('starts the periodic license refresh and forwards changes to the renderer', () => {
-            expect(mainJs).toContain('licenseService.startPeriodicRefresh(');
-            expect(mainJs).toContain("'license:changed'");
+        test('declares the PolyForm Noncommercial license', () => {
+            expect(pkg.license).toBe('PolyForm-Noncommercial-1.0.0');
         });
     });
 
-    // ── .env.production has required vars ────────────────────────────────────
-
-    describe('.env.production', () => {
-        const envContent = fs.readFileSync(path.join(ROOT, '.env.production'), 'utf8');
-
-        test('has DYNAMO_LICENSE_PUBLIC_KEY', () => {
-            expect(envContent).toContain('DYNAMO_LICENSE_PUBLIC_KEY');
-            expect(envContent).toContain('BEGIN PUBLIC KEY');
-        });
-
-        test('has LICENSE_SERVER_URL pointing to production', () => {
-            expect(envContent).toContain('LICENSE_SERVER_URL=https://dynamoops.io');
-        });
-
-        test('does NOT contain test/dev URLs', () => {
-            expect(envContent).not.toContain('localhost:3000');
-        });
-
-        test('public key equals the hardcoded fallback in licenseService.js', () => {
-            const envKey = (envContent.match(/^DYNAMO_LICENSE_PUBLIC_KEY=(.*)$/m) || [])[1] || '';
-            const normalize = (v) => v.replace(/^"|"$/g, '').replace(/\\n/g, '\n').replace(/\s+/g, '');
-            const svc = fs.readFileSync(path.join(ROOT, 'src/backend/services/licenseService.js'), 'utf8');
-            const fallback = (svc.match(/-----BEGIN PUBLIC KEY-----[\s\S]*?-----END PUBLIC KEY-----/) || [])[0] || '';
-            expect(fallback).not.toBe('');
-            expect(normalize(envKey)).toBe(normalize(fallback));
-        });
-    });
-
-    // ── index.html has LicenseManager loaded ─────────────────────────────────
+    // ── Frontend entry points ────────────────────────────────────────────────
 
     describe('index.html', () => {
-        const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
-
-        test('does NOT have standalone LicenseManager script tag', () => {
-            // LicenseManager should be bundled via app.js import, not a separate <script>
-            expect(html).not.toContain('<script src="/js/components/LicenseManager.js">');
-            expect(html).not.toContain("<script src='/js/components/LicenseManager.js'>");
-        });
+        const html = read('public/index.html');
 
         test('has app.js script tag', () => {
-            expect(html).toContain('js/app.js');
-        });
-
-        test('has license badge container in header', () => {
-            expect(html).toContain('header-actions');
-        });
-
-        test('has a license entry point on the login screen', () => {
-            expect(html).toContain('id="login-license-bar"');
+            expect(html).toContain('<script type="module" src="js/app.js"></script>');
         });
 
         test('has the AWS SSO sign-in pane and tab', () => {
@@ -181,124 +82,50 @@ describe('Build integrity', () => {
         });
     });
 
-    // ── app.js imports LicenseManager ────────────────────────────────────────
-
-    describe('app.js', () => {
-        const appJs = fs.readFileSync(path.join(ROOT, 'public/js/app.js'), 'utf8');
-
-        test('imports LicenseManager.js', () => {
-            expect(appJs).toContain("./components/LicenseManager.js");
-        });
-
-        test('initializes licenseManager', () => {
-            expect(appJs).toContain('window.licenseManager');
-            expect(appJs).toContain('.init()');
-        });
-    });
-
-    // ── LicenseManager.js has UI rules ───────────────────────────────────────
-
-    describe('LicenseManager.js', () => {
-        const lm = fs.readFileSync(path.join(ROOT, 'public/js/components/LicenseManager.js'), 'utf8');
-
-        test('defines _applyPlanToUI', () => {
-            expect(lm).toContain('_applyPlanToUI');
-        });
-
-        test('hides add-item-btn for free plan', () => {
-            expect(lm).toContain('add-item-btn');
-        });
-
-        test('hides import-btn for free plan', () => {
-            expect(lm).toContain('import-btn');
-        });
-
-        test('hides schema-export-btn for non pro_plus', () => {
-            expect(lm).toContain('schema-export-btn');
-        });
-
-        test('hides code-gen-btn for non pro_plus', () => {
-            expect(lm).toContain('code-gen-btn');
-        });
-
-        test('exposes the license from header, login screen, upgrade modal and shortcut', () => {
-            expect(lm).toContain('license-cta-btn');         // header call-to-action on Free
-            expect(lm).toContain('_renderLoginBar');         // login screen bar
-            expect(lm).toContain('upgrade-have-key-btn');    // "I have a license key" in upgrade modal
-            expect(lm).toContain('onLicenseOpen');           // macOS menu
-            const km = fs.readFileSync(path.join(ROOT, 'public/js/components/KeyboardManager.js'), 'utf8');
-            expect(km).toContain('showLicenseModal');        // Cmd/Ctrl+Shift+L
-        });
-
-        test('creates window.licenseManager', () => {
-            expect(lm).toContain('window.licenseManager');
-        });
-
-        test('shows upgrade modal with correct URL', () => {
-            expect(lm).toContain('dynamoops.io/#pricing');
-        });
-    });
-
-    // ── preload.js exposes correct API ───────────────────────────────────────
-
-    describe('preload.js', () => {
-        const preload = fs.readFileSync(path.join(ROOT, 'preload.js'), 'utf8');
-
-        test('exposes licenseStatus', () => {
-            expect(preload).toContain('licenseStatus');
-        });
-
-        test('exposes licenseActivate', () => {
-            expect(preload).toContain('licenseActivate');
-        });
-
-        test('exposes licenseDeactivate', () => {
-            expect(preload).toContain('licenseDeactivate');
-        });
-
-        test('exposes onLicenseOpen for the macOS menu', () => {
-            expect(preload).toContain('onLicenseOpen');
-            expect(preload).toContain("'license:open'");
-            const mainJs = fs.readFileSync(path.join(ROOT, 'electron-main.js'), 'utf8');
-            expect(mainJs).toContain("'license:open'");
-        });
-
-        test('uses contextBridge', () => {
-            expect(preload).toContain('contextBridge');
-        });
-    });
-
-    // ── Route protection ─────────────────────────────────────────────────────
-
-    describe('API routes have license protection', () => {
-        const routes = fs.readFileSync(path.join(ROOT, 'src/backend/routes/api.js'), 'utf8');
-
-        test('create table requires pro', () => {
-            expect(routes).toMatch(/post.*tables.*requirePlan.*pro/i);
-        });
-
-        test('delete item requires pro', () => {
-            expect(routes).toMatch(/delete.*items.*requirePlan.*pro/i);
-        });
-
-        test('imports requirePlan', () => {
-            expect(routes).toContain('requirePlan');
-        });
+    describe('API routes', () => {
+        const routes = read('src/backend/routes/api.js');
 
         test('exposes the SSO sign-in routes', () => {
             ['/sso/start', '/sso/poll', '/sso/accounts', '/sso/roles', '/sso/connect', '/sso/signout', '/sso/config']
                 .forEach((r) => expect(routes).toContain(r));
         });
+    });
 
-        test('PartiQL writes require pro (SELECT stays free)', () => {
-            expect(routes).toMatch(/execute-statement.*requirePlanWhen.*isWriteStatement.*'pro'/);
+    // ── Free for everyone: no paid-plan gating left anywhere ─────────────────
+
+    describe('no license / paid-plan code', () => {
+        const sources = [
+            'electron-main.js',
+            'server.js',
+            'src/backend/routes/api.js',
+            'public/index.html',
+            'public/js/app.js',
+            'public/js/api/apiClient.js',
+            'public/js/components/DataViewer.js',
+            'public/js/components/KeyboardManager.js',
+        ];
+
+        for (const file of sources) {
+            test(`${file} has no license or plan checks`, () => {
+                const src = read(file);
+                expect(src).not.toMatch(/licenseManager|licenseService|requirePlan|hasPlan|showUpgradeModal/);
+            });
+        }
+
+        test('license modules are gone', () => {
+            [
+                'src/backend/services/licenseService.js',
+                'src/backend/middleware/license.js',
+                'public/js/components/LicenseManager.js',
+                '.env.production',
+            ].forEach((f) => expect(fs.existsSync(path.join(ROOT, f))).toBe(false));
         });
     });
 
     // ── stsService does not inherit stale endpoint ───────────────────────────
 
     describe('stsService.js', () => {
-        const sts = fs.readFileSync(path.join(ROOT, 'src/backend/services/stsService.js'), 'utf8');
+        const sts = read('src/backend/services/stsService.js');
 
         test('does NOT fallback to awsConfig.currentConfig.endpoint', () => {
             expect(sts).not.toContain("awsConfig.currentConfig.endpoint");

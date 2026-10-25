@@ -70,6 +70,29 @@ describe('connectionController', () => {
         });
     });
 
+    describe('environment tag', () => {
+        test('getConfig returns the env tag of the session', () => {
+            awsConfig.setCurrentConfig({ region: 'us-east-1', profile: 'default', endpoint: 'http://localhost:4566' });
+            awsConfig.setEnvTag('local');
+
+            const res = mockRes();
+            connectionController.getConfig({}, res);
+
+            expect(res._json).toMatchObject({ endpoint: 'http://localhost:4566', envTag: 'local' });
+        });
+
+        test('unknown tags fall back to none', () => {
+            awsConfig.setEnvTag('<script>');
+            expect(awsConfig.currentConfig.envTag).toBe('none');
+        });
+
+        test('disconnect clears the env tag', () => {
+            awsConfig.setEnvTag('prod');
+            connectionController.disconnect({}, mockRes());
+            expect(awsConfig.currentConfig.envTag).toBe('none');
+        });
+    });
+
     describe('connect', () => {
         test('clears assumedRoleInfo on new connection', async () => {
             awsConfig.setAssumedRoleInfo({ roleArn: 'arn:aws:iam::123:role/old' });

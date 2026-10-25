@@ -19,8 +19,6 @@ import { initCodeGenerator } from './components/CodeGenerator.js';
 import { initTableDashboard } from './components/TableDashboard.js';
 import { initChartView } from './components/ChartView.js';
 import { initItemTemplateManager } from './components/ItemTemplateManager.js';
-// LicenseManager is a plain class (not ES module) — import as side-effect so esbuild bundles it
-import './components/LicenseManager.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     initThemeManager();
@@ -44,11 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initChartView();
     initItemTemplateManager();
     initKeyboardManager();
-
-    // Initialize license manager
-    if (window.licenseManager) {
-        window.licenseManager.init();
-    }
 
     // Load initial AWS config if server has credentials cached
     fetchInitialConfig();

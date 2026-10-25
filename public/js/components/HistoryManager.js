@@ -1,21 +1,14 @@
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
 import { showToast } from '../utils/toast.js';
+import { escapeHtml } from '../utils/html.js';
+import { loadJSON, saveJSON } from '../utils/storage.js';
 
 const STORAGE_KEY = 'dynamo-gui-query-history';
 const MAX_HISTORY = 50;
 
-function getHistory() {
-    try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-    } catch {
-        return [];
-    }
-}
-
-function saveHistory(history) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-}
+const getHistory = () => loadJSON(STORAGE_KEY, []);
+const saveHistory = (history) => saveJSON(STORAGE_KEY, history);
 
 export function initHistoryManager() {
     const toggleBtn = $('#history-toggle-btn');
@@ -86,13 +79,13 @@ function renderHistory() {
         const time = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         return `
-            <div class="history-item" data-id="${entry.id}">
+            <div class="history-item" data-id="${escapeHtml(entry.id)}">
                 <div class="history-item-info">
                     <div class="history-item-top">
-                        <span class="history-item-type ${entry.type}">${entry.type}</span>
-                        <span class="history-item-table">${entry.table}</span>
+                        <span class="history-item-type ${escapeHtml(entry.type)}">${escapeHtml(entry.type)}</span>
+                        <span class="history-item-table">${escapeHtml(entry.table)}</span>
                     </div>
-                    <div class="history-item-snippet">${snippet}</div>
+                    <div class="history-item-snippet">${escapeHtml(snippet)}</div>
                 </div>
                 <div class="history-item-time">${time}</div>
             </div>
