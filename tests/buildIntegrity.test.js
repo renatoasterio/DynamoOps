@@ -57,8 +57,11 @@ describe('Build integrity', () => {
             expect(pkg.build.productName).toBe('DynamoOps');
         });
 
-        test('declares the PolyForm Noncommercial license', () => {
-            expect(pkg.license).toBe('PolyForm-Noncommercial-1.0.0');
+        test('points to the LICENSE file (MIT + Commons Clause)', () => {
+            expect(pkg.license).toBe('SEE LICENSE IN LICENSE');
+            const license = read('LICENSE');
+            expect(license).toContain('Commons Clause');
+            expect(license).toContain('MIT License');
         });
     });
 
