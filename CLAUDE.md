@@ -2,22 +2,15 @@
 
 GUI desktop para AWS DynamoDB com foco em alta produtividade.
 
-## Branches
+## Licença do projeto
 
-| Branch | Descrição |
-|--------|-----------|
-| `feat/license-system` | **Versão paga** — controle de licença JWT (ES256), planos Free/Pro/Pro+, validação offline, Stripe subscription |
-| `feature/no-license` | **Versão sem licença** — todas as features liberadas, sem controle de plano |
-| `main` | Base de desenvolvimento |
-
-> A branch atual (`feat/license-system`) é a versão comercial com sistema de licença.
+Código aberto sob **PolyForm Noncommercial 1.0.0** (`LICENSE`): uso, cópia e modificação livres para fins não comerciais, com crédito obrigatório (linha `Required Notice`). Todas as features são gratuitas — não existe sistema de planos/licença no app.
 
 ## Stack
 
 - **Electron** + **Express** (port 3457) + **vanilla JS** (ES modules)
-- `electron-main.js` — janela principal, menu, IPC para licença
+- `electron-main.js` — janela principal, menu, carrega o Express
 - `server.js` — inicia o Express
-- `preload.js` — contextBridge (licenseStatus, licenseActivate, licenseDeactivate)
 
 ## Estrutura
 
@@ -27,11 +20,10 @@ src/backend/
   controllers/           — connectionController, tableController
   middleware/
     connection.js        — injeta req.clients por request (ou usa assumed role global)
-    license.js           — requirePlan('pro') middleware (402 se plano insuficiente)
   services/
     dynamoService.js     — scan, query, CRUD, truncate, streams
     stsService.js        — AssumeRole STS
-    licenseService.js    — JWT verify, grace period, refresh online
+    ssoService.js        — login AWS SSO (IAM Identity Center)
   routes/api.js          — todas as rotas Express
 
 public/
@@ -47,7 +39,6 @@ public/
       QueryPanel.js      — scan/query/SQL, filtros, paginação
       ChartView.js       — timeline/distribuição/heatmap (SVG puro)
       Sidebar.js         — lista de tabelas
-      LicenseManager.js  — UI de ativação, _applyPlanToUI()
       SchemaExporter.js  — export CF/Terraform/CDK
 ```
 
@@ -57,14 +48,6 @@ public/
 - `state.tabs[]`: cada tab guarda items, queryState, searchTerm, connection
 - `/disconnect` reseta assumedRoleInfo + currentConfig no backend
 - `resetPreviousSession()` (LoginManager): limpa tudo antes de nova conexão
-
-## Licença (branch feat/license-system)
-
-- JWT ECDSA P-256 com chave pública embarcada em `licenseService.js`
-- Validação offline: JWT válido → plano ativo; expirado → grace period 7 dias → free
-- Refresh online: POST /api/license/refresh (30 dias tolerância)
-- UI: `_applyPlanToUI()` esconde botões por plano; middleware retorna 402
-- Chaves separadas: dev (.env) vs production (.env.production)
 
 ## Build
 

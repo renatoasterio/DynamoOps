@@ -1,324 +1,164 @@
 <p align="center">
-  <img src="public/icon.png" alt="DynamoDB GUI" width="80" />
+  <img src="assets/icons/icon.png" alt="DynamoOps" width="80" />
 </p>
 
-<h1 align="center">DynamoDB GUI</h1>
+<h1 align="center">DynamoOps</h1>
 
 <p align="center">
-  <strong>A interface visual definitiva para Amazon DynamoDB.</strong><br/>
-  Consulte, edite e gerencie suas tabelas com a mesma fluidez do MongoDB Compass — sem sair do seu Mac.
+  <strong>Interface desktop gratuita para Amazon DynamoDB.</strong><br/>
+  Consulte, edite e gerencie suas tabelas com a fluidez do MongoDB Compass — no macOS e no Windows.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-blueviolet" />
-  <img src="https://img.shields.io/badge/platform-macOS-000?logo=apple&logoColor=white" />
-  <img src="https://img.shields.io/badge/arch-Apple%20Silicon%20%7C%20Intel-blue" />
-  <img src="https://img.shields.io/badge/license-Proprietary-red" />
+  <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" />
   <img src="https://img.shields.io/badge/node-%3E%3D18-green?logo=node.js&logoColor=white" />
-  <img src="https://img.shields.io/badge/electron-33.x-47848F?logo=electron&logoColor=white" />
+  <img src="https://img.shields.io/badge/electron-35.x-47848F?logo=electron&logoColor=white" />
 </p>
 
 ---
 
-## Por que o DynamoDB GUI?
+## Por que o DynamoOps?
 
-O AWS Console é lento, burocrático e não foi feito para desenvolvedores que precisam de agilidade. Ferramentas CLI exigem memorizar sintaxes. O DynamoDB GUI resolve isso tudo numa interface desktop elegante, rápida e produtiva.
+O AWS Console é lento para o dia a dia e a CLI exige decorar sintaxe. O DynamoOps junta tudo numa interface desktop rápida, com todas as funcionalidades liberadas — sem planos, sem cadastro, sem licença para ativar.
 
-| Problema | Nossa Solução |
+| Problema | Solução |
 |---|---|
-| Console AWS lento e verboso | Interface local instantânea, zero latência de navegação |
-| CLI pouco intuitiva | Query builder visual com autocomplete context-aware |
-| Sem visão rápida dos dados | Dual view: Tabela ↔ JSON estilo MongoDB Compass |
-| Gestão de credenciais complexa | Assume Role visual com 1 clique + perfis salvos |
-| Import/Export manual e tedioso | Bulk import/export JSON e CSV nativos |
-| Trocar de tabela perde contexto | Sistema de abas — múltiplas tabelas abertas simultaneamente |
-| Esquema de tabela difícil de exportar | Export para CloudFormation YAML ou Terraform HCL com 1 clique |
+| Console AWS lento e verboso | Interface local instantânea |
+| CLI pouco intuitiva | Scan/Query visual e editor PartiQL com autocomplete |
+| Sem visão rápida dos dados | Tabela, JSON (nativo ou DynamoDB JSON) e gráficos |
+| Gestão de credenciais complexa | Perfis AWS, Assume Role, AWS SSO e LocalStack |
+| Import/Export manual | JSON, CSV e Excel em lote |
+| Trocar de tabela perde contexto | Abas com estado independente |
 
 ---
 
 ## ✨ Funcionalidades
 
-### 🔐 Conexão Inteligente
-- **Multi-Profile**: Conecte-se usando qualquer perfil AWS configurado (`~/.aws/credentials`).
-- **Perfis Salvos**: Salve e carregue configurações de conexão frequentes com um clique.
-- **Custom Endpoint**: Suporte completo a DynamoDB Local, LocalStack e endpoints customizados.
-- **Assume Role (STS)**: Assuma roles IAM visualmente — informe o ARN e clique. Credenciais temporárias geradas automaticamente via `sts:AssumeRole`, com badge visual indicando o role ativo.
-- **Logout Seguro**: Botão de logout no header encerra a sessão e fecha todas as abas abertas automaticamente.
+### 🔐 Conexão
+- **Perfis AWS** (`~/.aws/credentials`) e **perfis salvos** com conexões recentes.
+- **Assume Role (STS)** com histórico de roles e etiqueta de ambiente (dev, qa, staging, prod, local).
+- **AWS SSO (IAM Identity Center)**: login pelo navegador, escolha de conta e role.
+- **Endpoint customizado**: DynamoDB Local, LocalStack e afins.
 
-### 🗂️ Sistema de Abas
-- **Multi-tabela**: Abra várias tabelas simultaneamente em abas independentes.
-- **Contexto preservado**: Cada aba mantém seu próprio estado de query, filtros e paginação.
-- **Fechar abas**: Clique no `×` de cada aba ou use o logout para fechar todas de uma vez.
-- **Navegação por teclado**: `Cmd+[` / `Cmd+]` para navegar entre abas sem tirar as mãos do teclado.
+### 📊 Visualização
+- **Tabela** com colunas ordenáveis, redimensionáveis e reordenáveis, edição inline (duplo clique) e seleção múltipla com exclusão em lote.
+- **JSON** em árvore colapsável, alternando entre JSON nativo e **DynamoDB JSON** (`{"S": …}`, `{"N": …}`).
+- **Gráficos**: timeline, distribuição e heatmap (SVG puro).
+- **Dashboard** da tabela e **Cost Tracker** com o custo estimado de cada operação (RCU/WCU).
 
-### 📊 Visualização de Dados
-- **Table View**: Dados tabulares com colunas inteligentemente ordenadas (PKs e SKs primeiro), ações inline por registro (Editar, Copiar, Excluir). Detecta automaticamente todas as colunas dos documentos carregados.
-- **JSON View (Compass Style)**: Cada documento renderizado como árvore JSON interativa e colapsável — expanda e retraia objetos e arrays com um clique, exatamente como o MongoDB Compass. Layout compacto com separadores sutis.
-- **Alternância de view**: Toggle Table ↔ JSON disponível diretamente acima dos dados.
+### 🔍 Consultas
+- **Scan** e **Query** (índice primário e GSIs) com filtros visuais e paginação.
+- **PartiQL** com destaque de sintaxe, templates, formatador, erros inline, confirmação antes de escritas e autocomplete de tabelas, colunas, funções e operadores.
+- **Histórico** de consultas para reaproveitar com um clique.
 
-### 🔍 Consultas Avançadas
-- **Scan**: Varredura completa da tabela com filtros visuais configuráveis por atributo, tipo e operador.
-- **Query**: Queries pelo índice primário ou GSIs com condições de filtro e operadores matemáticos.
-- **SQL (PartiQL)**: Editor SQL completo com autocomplete inteligente:
-  - **Context-aware**: após `FROM` sugere tabelas, após `WHERE`/`AND`/`OR` sugere colunas e funções, após coluna sugere operadores
-  - **Sugestões categorizadas** com ícones: `⌨` keywords, `🗂` tables, `🔑` pk/sk, `≡` attrs, `ƒ` functions, `◈` operators
-  - **Funções PartiQL**: `attribute_exists`, `attribute_not_exists`, `begins_with`, `contains`, `size`, `attribute_type`
-  - **Condições especiais**: `IS NULL`, `IS NOT NULL`, `IS MISSING`, `IS NOT MISSING`
-  - Navegação por teclado (`↑↓` navegar, `Tab`/`Enter` inserir, `Esc` fechar)
-  - Editor auto-redimensionável
+### ✏️ Itens
+- Inserir, editar, clonar, copiar e excluir itens (editor JSON ou formulário via **templates** por tabela).
+- **Histórico de versões** por item com diff visual e restauração.
+- **Import** JSON/CSV/Excel e **export** JSON/CSV com seleção de campos.
 
-### ⌨️ Atalhos de Teclado
+### 🗃️ Tabelas e esquema
+- Criar, excluir e truncar tabelas; criar e excluir **GSIs**.
+- **Exportar esquema** para CloudFormation, Terraform e CDK.
+- **Gerador de código** da consulta atual e de SDK completo em várias linguagens.
+- **DynamoDB Streams**: feed ao vivo de INSERT / MODIFY / REMOVE.
+
+### 🎨 Interface
+- Tema escuro e claro, sidebar recolhível, abas e atalhos de teclado.
+
 | Atalho | Ação |
 |---|---|
-| `Cmd+Enter` | Executar query (funciona dentro do editor SQL) |
-| `Cmd+W` | Fechar aba ativa |
-| `Cmd+R` | Recarregar dados da tabela |
-| `Cmd+[` / `Cmd+]` | Navegar para aba anterior / próxima |
-| `Cmd+K` | Focar busca de tabelas na sidebar |
-| `Cmd+F` | Focar busca de itens no toolbar |
-| `Esc` | Fechar modal aberto |
-
-### 🗃️ Gerenciamento de Tabelas & GSI
-- **Criar Tabelas**: Defina Partition Key, Sort Key e tipos de atributo diretamente na interface.
-- **Excluir Tabelas**: Confirmação segura em duas etapas (digite o nome para confirmar).
-- **Truncar Tabelas**: Limpe todos os dados preservando a estrutura — ideal para desenvolvimento.
-- **GSI (Global Secondary Index)**:
-  - Crie GSIs visualmente — defina Index Name, Partition Key, Sort Key e Projection (ALL / KEYS_ONLY / INCLUDE)
-  - Visualize todos os GSIs ativos no info bar da tabela com suas keys e status
-  - Delete GSIs diretamente pelo botão `✕` em cada GSI exibido
-  - Operações assíncronas com feedback de status (CREATING / ACTIVE)
-
-### 📄 Exportação de Schema
-- Botão **Schema** no info bar de cada tabela abre um modal com o schema completo gerado automaticamente:
-  - **CloudFormation YAML** — pronto para usar em stacks AWS, inclui `Resources`, `Outputs`, GSIs, LSIs e TTL
-  - **Terraform HCL** — recurso `aws_dynamodb_table` completo com todos os atributos, GSIs, LSIs, TTL e tags
-- Botão "Copy to Clipboard" para uso imediato
-
-### ⚡ DynamoDB Streams — Feed em Tempo Real
-- Botão **⚡ Stream** no toolbar ativa o painel live (somente se a tabela tiver streams habilitados).
-- **Polling automático** a cada 3 segundos usando `GetRecords` via shard iterators.
-- Feed exibe: horário · tipo de operação · chaves do item · resumo de mudanças.
-- Operações com color-coding: 🟢 **INSERT** · 🟡 **MODIFY** · 🔴 **REMOVE**.
-- Para MODIFY, mostra quais campos foram alterados (`~campo`), adicionados (`+campo`) ou removidos (`-campo`).
-- Botões **Pause/Resume** e **Clear** no cabeçalho do painel.
-- Máximo de 200 eventos em memória (rolling buffer).
-
-### 🕐 Versionamento de Itens
-- Cada vez que um item é **editado e salvo**, a versão anterior é armazenada automaticamente no `localStorage`.
-- Botão **🕐** em cada linha da tabela abre o modal de **Version History**.
-- Modal exibe lista de versões salvas (com data/hora) e um **diff visual lado a lado**:
-  - 🟢 Campos adicionados · 🔴 Campos removidos · 🟡 Campos modificados · ⚪ Sem mudança
-- Botão **Restore this version** reabre o editor com o conteúdo da versão selecionada.
-- Histórico local: até 20 versões por item, sem dependência de backend ou tabela auxiliar.
-
-### 🕒 Histórico de Queries
-- Registro automático de todas as queries executadas (Scan, Query, SQL).
-- Painel de histórico colapsável com visualização compacta.
-- Reutilize queries anteriores com um clique.
-
-### ✏️ CRUD de Itens
-- Insira, edite e exclua itens com editor JSON integrado e validação em tempo real.
-- Clone itens existentes para criar variações rapidamente.
-- Copie o JSON de qualquer item para a área de transferência.
-
-### 📥📤 Import & Export em Lote
-- **Export**: Exporte resultados de qualquer consulta para **JSON** ou **CSV** com um clique.
-- **Import**: Importe arquivos JSON ou CSV em massa via BatchWrite otimizado, com controle de tamanho de batch.
-
-### 🎨 Design & UX
-- **Dark / Light Mode**: Alterne entre temas com um clique — preferência persistida entre sessões.
-- **Glassmorphism** na tela de login e micro-animações para experiência fluida.
-- **Toast notifications** para feedback instantâneo de cada ação.
-- **Janela nativa macOS**: Suporte a drag da janela pelo header com `titleBarStyle: hiddenInset`.
-
----
-
-## 🏗️ Arquitetura
-
-O projeto segue uma **arquitetura modular** com separação clara de responsabilidades:
-
-```
-dynamoGUI/
-├── electron-main.js                  # Processo principal Electron
-├── server.js                         # Entry point Express (modo web)
-├── package.json
-│
-├── src/backend/                      # 🔧 Backend (Node.js + Express)
-│   ├── app.js                        #    Setup Express, middlewares, static files
-│   ├── config/
-│   │   └── aws.js                    #    Configuração centralizada dos clientes AWS (stateless)
-│   ├── middleware/
-│   │   └── connection.js             #    Middleware de validação de conexão ativa
-│   ├── services/
-│   │   ├── dynamoService.js          #    Wrapper DynamoDB SDK v3 (tabelas, itens, GSI)
-│   │   └── stsService.js             #    Lógica de AssumeRole (STS)
-│   ├── controllers/
-│   │   ├── connectionController.js   #    POST /api/connect — handshake e validação
-│   │   ├── tableController.js        #    CRUD de tabelas, truncate, GSI
-│   │   └── itemController.js         #    Scan, Query, PartiQL, CRUD de itens, import/export
-│   └── routes/
-│       └── api.js                    #    Roteamento Express
-│
-└── public/                           # 🎨 Frontend (ES6 Modules, Vanilla JS)
-    ├── index.html                    #    SPA shell
-    ├── styles.css                    #    Design system completo (dark/light themes)
-    └── js/
-        ├── app.js                    #    Orquestrador — inicializa e conecta todos os módulos
-        ├── api/
-        │   └── apiClient.js          #    Fetch wrapper centralizado com error handling
-        ├── state/
-        │   └── store.js              #    Estado global da aplicação
-        ├── utils/
-        │   ├── dom.js                #    Helpers de DOM
-        │   └── toast.js              #    Sistema de notificações toast
-        └── components/
-            ├── LoginManager.js       #    Tela de login, logout, troca de conexão
-            ├── ProfileManager.js     #    Persistência de perfis de conexão salvos
-            ├── ConnectionManager.js  #    Barra de conexão + Assume Role
-            ├── ThemeManager.js       #    Dark / Light mode toggle
-            ├── KeyboardManager.js    #    Atalhos de teclado globais
-            ├── TabManager.js         #    Sistema de abas multi-tabela
-            ├── Sidebar.js            #    Lista de tabelas + busca
-            ├── TableManager.js       #    Create / Delete / Truncate de tabelas
-            ├── GsiManager.js         #    Criação e deleção de GSIs
-            ├── SchemaExporter.js     #    Exportação de schema (CloudFormation / Terraform)
-            ├── StreamsPanel.js       #    DynamoDB Streams — feed live com polling
-            ├── VersionHistory.js     #    Histórico de versões por item + diff visual
-            ├── QueryPanel.js         #    Scan / Query / SQL + Autocomplete context-aware
-            ├── HistoryManager.js     #    Histórico de queries executadas
-            ├── DataViewer.js         #    Table view + JSON Compass view
-            └── ItemManager.js        #    CRUD de itens + Import/Export em lote
-```
-
-### API REST
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `GET` | `/api/config` | Configuração AWS atual |
-| `POST` | `/api/connect` | Estabelecer conexão |
-| `POST` | `/api/assume-role` | Assume Role via STS |
-| `GET` | `/api/tables` | Listar todas as tabelas |
-| `POST` | `/api/tables` | Criar tabela |
-| `GET` | `/api/tables/:name` | Descrever tabela |
-| `DELETE` | `/api/tables/:name` | Deletar tabela |
-| `POST` | `/api/tables/:name/truncate` | Truncar tabela |
-| `POST` | `/api/tables/:name/gsi` | Criar GSI |
-| `DELETE` | `/api/tables/:name/gsi/:gsiName` | Deletar GSI |
-| `GET` | `/api/tables/:name/stream` | Status do stream (enabled, ARN, viewType) |
-| `GET` | `/api/tables/:name/stream/records` | Últimos registros do stream (polling) |
-| `POST` | `/api/tables/:name/scan` | Scan com filtros |
-| `POST` | `/api/tables/:name/query` | Query por índice |
-| `POST` | `/api/execute-statement` | PartiQL statement |
-| `PUT` | `/api/tables/:name/items` | Criar/atualizar item |
-| `DELETE` | `/api/tables/:name/items` | Deletar item |
-| `POST` | `/api/tables/:name/batch-write` | Import em lote |
-
-### Stack Tecnológica
-
-| Camada | Tecnologia |
-|---|---|
-| **Runtime** | Node.js ≥ 18 |
-| **Backend** | Express.js 4.x |
-| **AWS SDK** | v3 — DynamoDB, DynamoDB Document Client, STS, Credential Providers |
-| **Frontend** | Vanilla JS (ES6 Modules), HTML5, CSS3 |
-| **Desktop** | Electron 33.x + electron-builder |
-| **Target** | macOS (Apple Silicon + Intel Universal) |
+| `Cmd/Ctrl+Enter` | Executar consulta |
+| `Cmd/Ctrl+W` | Fechar aba |
+| `Cmd/Ctrl+R` | Recarregar dados |
+| `Cmd/Ctrl+[` / `]` | Aba anterior / próxima |
+| `Cmd/Ctrl+K` | Buscar tabela na sidebar |
+| `Cmd/Ctrl+B` | Recolher / expandir a sidebar |
+| `Cmd/Ctrl+F` | Filtrar itens carregados |
+| `Esc` | Fechar modal |
 
 ---
 
 ## 🚀 Começando
 
 ### Pré-requisitos
-
-- **Node.js** v18+ e **npm**
-- Credenciais AWS configuradas em `~/.aws/credentials`
-- (Opcional) **AWS CLI** para gerenciar múltiplos perfis
+- **Node.js** 18+ e **npm**
+- Credenciais AWS em `~/.aws/credentials` (ou SSO / LocalStack)
 
 ### Instalação
 
 ```bash
-git clone <repo-url>
-cd dynamoGUI
+git clone https://github.com/renatoasterio/dynamo-studio-gui.git
+cd dynamo-studio-gui
 npm install
 ```
 
-### Modo Desenvolvimento (Navegador)
+### Rodar
 
 ```bash
-npm run dev
-# → http://localhost:3456
-```
-
-### Modo Desktop (Electron)
-
-```bash
+# Desktop (Electron)
 npm run electron
+
+# Só no navegador → http://localhost:3457
+npm run dev
 ```
 
-### Builds de desenvolvimento (sem obfuscação)
+### Testes
 
 ```bash
-# macOS — Apple Silicon
-npm run build
-
-# macOS — Universal (Intel + Apple Silicon)
-npm run build:universal
-
-# Windows x64
-npm run build:win
-
-# Windows x64 + x86
-npm run build:win:all
+npm test
 ```
 
-### Builds de produção (com obfuscação de código)
-
-O código JS é obfuscado automaticamente em uma cópia staging — **os arquivos fonte nunca são modificados**.
+### Gerar instaladores
 
 ```bash
-# macOS — Apple Silicon
-npm run build:prod:mac
-
-# macOS — Universal
-npm run build:prod:mac:universal
-
-# Windows x64
-npm run build:prod:win
-
-# macOS + Windows juntos
-npm run build:prod:all
+npm run build:prod:mac            # macOS Apple Silicon (.dmg)
+npm run build:prod:mac:universal  # macOS Universal
+npm run build:prod:win            # Windows x64 (instalador NSIS + portable)
 ```
 
-Artefatos gerados em `dist/`:
+Os arquivos ficam em `dist/`. O frontend é empacotado com esbuild numa cópia em staging; os arquivos fonte não são alterados.
 
-| Arquivo | Plataforma | Descrição |
-|---|---|---|
-| `DynamoDB GUI-2.0.0-arm64.dmg` | macOS | Installer drag-and-drop |
-| `DynamoDB GUI Setup 2.0.0.exe` | Windows | Installer NSIS com wizard |
-| `DynamoDB GUI 2.0.0.exe` | Windows | Portable — sem instalação |
-
-#### O que a obfuscação protege
-- Renomeia variáveis e funções para nomes hexadecimais
-- Codifica string literals em base64
-- Injeta control-flow flattening para dificultar análise estática
-- Empacota tudo em `.asar` criptografado pelo Electron
-
-> **Credenciais AWS no Windows**: o SDK lê automaticamente `%USERPROFILE%\.aws\credentials`. Configure via AWS CLI (`aws configure`) ou copie o arquivo manualmente.
+> **Windows**: o SDK lê `%USERPROFILE%\.aws\credentials`. Configure com `aws configure`.
 
 ---
 
-## 🗺️ Roadmap
+## 🏗️ Arquitetura
 
-- [x] Histórico local de queries e scans executados
-- [x] Suporte a múltiplos perfis de conexão salvos
-- [x] Light mode / Dark mode
-- [x] Sistema de abas multi-tabela
-- [x] SQL PartiQL com autocomplete context-aware
-- [x] JSON view estilo MongoDB Compass
-- [x] Atalhos de teclado avançados (`Cmd+Enter`, `Cmd+W`, `Cmd+R`, `Cmd+[/]`, `Cmd+K`)
-- [x] Exportação de schema — CloudFormation YAML e Terraform HCL
-- [x] GSI — criação e deleção visual de Global Secondary Indexes
-- [x] DynamoDB Streams — painel live com polling, feed de eventos INSERT/MODIFY/REMOVE
-- [x] Versionamento de itens — histórico local por item com diff visual campo a campo
+Electron + servidor Express local (porta 3457) + frontend em JavaScript puro (ES modules).
+
+```
+electron-main.js          Processo principal do Electron (sobe o Express)
+server.js                 Entry point do Express (modo navegador)
+src/backend/
+  config/aws.js           Clientes AWS e cache por conexão
+  middleware/connection.js  Injeta os clientes AWS por requisição
+  controllers/            connection, table, item, import, sso
+  services/               dynamoService, stsService, ssoService, streamsService
+  routes/api.js           Rotas /api
+public/
+  index.html, styles.css  SPA e tema (variáveis CSS, escuro/claro)
+  js/state/store.js       Estado global e por aba
+  js/api/apiClient.js     Wrapper de fetch com headers de conexão
+  js/components/          DataViewer, QueryPanel, SqlEditor, TabManager, LoginManager, …
+scripts/build-prod.js     Build de produção (esbuild + electron-builder)
+tests/                    Testes Jest
+```
 
 ---
+
+## 🤝 Contribuindo
+
+Issues e pull requests são bem-vindos. Antes de abrir um PR, rode `npm test`.
+
+---
+
+## 📄 Licença
+
+DynamoOps é distribuído sob a **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+
+- ✅ Você pode usar, copiar, modificar e redistribuir para fins **não comerciais**: uso pessoal, estudo, pesquisa, projetos hobby e organizações sem fins lucrativos (instituições de ensino, ONGs, órgãos públicos).
+- ✅ Ao distribuir cópias ou versões modificadas, mantenha o arquivo `LICENSE` e a linha `Required Notice` com o crédito ao autor.
+- ❌ Uso comercial não é permitido sem autorização do autor — isso inclui vender ou embutir em produto/serviço pago **e** usar a ferramenta no trabalho de uma empresa com fins lucrativos.
+
+Copyright (c) 2026 Renato Asterio.
