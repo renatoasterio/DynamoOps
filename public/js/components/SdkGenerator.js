@@ -4,6 +4,8 @@
  * Each language follows idiomatic conventions: folder layout, naming, design patterns.
  */
 
+import { downloadBlob } from '../utils/download.js';
+
 // ─── Name helpers ─────────────────────────────────────────────────────────────
 
 function toPascalCase(str) {
@@ -45,23 +47,11 @@ function pyType(t) { return t === 'N' ? 'float' : 'str'; }
 function javaType(t) { return t === 'N' ? 'Double' : 'String'; }
 function csType(t) { return t === 'N' ? 'double' : 'string'; }
 function goType(t) { return t === 'N' ? 'float64' : 'string'; }
-function rubyType(t) { return t === 'N' ? 'Float' : 'String'; }
-
-/** Example literal values */
-function exampleVal(name, type) {
-    if (type === 'N') return '42.0';
-    return `"example-${name}"`;
-}
-function exampleValGo(name, type) {
-    if (type === 'N') return '42.0';
-    return `"example-${name}"`;
-}
 
 // ─── Node.js (TypeScript) ─────────────────────────────────────────────────────
 
 export function sdkNodejs(tableName, ki, region) {
     const entity    = entityName(tableName);
-    const entityVar = toCamelCase(entity);
     const repoName  = `${entity}Repository`;
     const svcName   = `${entity}Service`;
     const pkJs      = toCamelCase(ki.pkName);
@@ -71,8 +61,6 @@ export function sdkNodejs(tableName, ki, region) {
 
     const skField    = skJs ? `\n  ${skJs}: ${skT};` : '';
     const skParam    = skJs ? `, ${skJs}: ${skT}` : '';
-    const skKeyPart  = skJs ? `\n      ${ki.skName}: { [ki.skType === 'N' ? 'N' : 'S']: String(${skJs}) },` : '';
-    const skKeyLine  = skJs ? `\n        ${ki.skName}: marshal(${skJs}),` : '';
 
     return {
         'package.json': JSON.stringify({
@@ -328,7 +316,6 @@ export function sdkPython(tableName, ki, region) {
     const skPy      = ki.skType ? pyType(ki.skType) : null;
     const skField   = skSn ? `\n    ${skSn}: ${skPy}` : '';
     const skParam   = skSn ? `, ${skSn}: ${skPy}` : '';
-    const skKey     = skSn ? `\n            "${ki.skName}": ${skSn},` : '';
 
     return {
         'requirements.txt': `boto3>=1.26.0
@@ -555,7 +542,6 @@ export function sdkJava(tableName, ki, region) {
     const pkAV     = ki.pkType === 'N' ? `AttributeValue.fromN(String.valueOf(${toCamelCase(pkJava)}))` : `AttributeValue.fromS(${toCamelCase(pkJava)})`;
     const skAV     = skJava ? (ki.skType === 'N' ? `AttributeValue.fromN(String.valueOf(${toCamelCase(skJava)}))` : `AttributeValue.fromS(${toCamelCase(skJava)})`) : null;
     const skParam  = skJava ? `, ${skT} ${toCamelCase(skJava)}` : '';
-    const skKey    = skJava ? `\n                .put("${skJava}", ${skAV})` : '';
     const skField  = skJava ? `\n    private ${skT} ${toCamelCase(skJava)};` : '';
     const skGetter = skJava ? `\n    public ${skT} get${toPascalCase(skJava)}() { return ${toCamelCase(skJava)}; }
     public void set${toPascalCase(skJava)}(${skT} ${toCamelCase(skJava)}) { this.${toCamelCase(skJava)} = ${toCamelCase(skJava)}; }` : '';
@@ -814,9 +800,7 @@ export function sdkCSharp(tableName, ki, region) {
     const skCs    = ki.skName ? toPascalCase(ki.skName) : null;
     const pkT     = csType(ki.pkType);
     const skT     = ki.skType ? csType(ki.skType) : null;
-    const skProp  = skCs ? `\n    public ${skT} ${skCs} { get; set; }` : '';
     const skParam = skCs ? `, ${skT} ${skCs.toLowerCase()}` : '';
-    const skKey   = skCs ? `\n            { "${ki.skName}", ${ki.skType === 'N' ? `new AttributeValue { N = ${skCs.toLowerCase()}.ToString() }` : `new AttributeValue { S = ${skCs.toLowerCase()} }`} },` : '';
     const proj    = `${entity}DynamoSdk`;
 
     return {
@@ -1020,8 +1004,6 @@ export function sdkGo(tableName, ki, region) {
     const mod      = `github.com/example/${toKebabCase(tableName)}-dynamo-sdk`;
     const skField  = skGo ? `\n\t${toPascalCase(ki.skName)} ${skT}` : '';
     const skParam  = skGo ? `, ${skGo} ${skT}` : '';
-    const skKeyPart = skGo ? `\n\t\t"${ki.skName}": ${ki.skType === 'N' ? `&types.AttributeValueMemberN{Value: fmt.Sprintf("%v", ${skGo})}` : `&types.AttributeValueMemberS{Value: ${skGo}}`},` : '';
-    const skStructField = skGo ? `\n\t\t\t${toPascalCase(ki.skName)}: ${ki.skType === 'N' ? `parseFloat(item["${ki.skName}"])` : `item["${ki.skName}"].(*types.AttributeValueMemberS).Value`},` : '';
 
     return {
         'go.mod': `module ${mod}
@@ -1239,7 +1221,6 @@ export function sdkRuby(tableName, ki, region) {
     const entitySn = toSnakeCase(entity);
     const pkRb    = toSnakeCase(ki.pkName);
     const skRb    = ki.skName ? toSnakeCase(ki.skName) : null;
-    const skParam = skRb ? `, ${skRb}:` : '';
     const skArgFn = skRb ? `, ${skRb}:` : '';
 
     return {
@@ -1406,7 +1387,6 @@ export function sdkPhp(tableName, ki, region) {
     const skKey   = skPhp ? `\n            '${ki.skName}' => ['${ki.skType === 'N' ? 'N' : 'S'}' => ${ki.skType === 'N' ? '(string)$' : '$'}${skPhp}],` : '';
     const skField = skPhp ? `\n    private ${skT} $${skPhp};` : '';
     const skGet   = skPhp ? `\n    public function get${toPascalCase(ki.skName)}(): ${skT} { return $this->${skPhp}; }` : '';
-    const skConst = skPhp ? `\n        $this->${skPhp} = $${skPhp};` : '';
 
     return {
         'composer.json': JSON.stringify({
@@ -1636,9 +1616,6 @@ echo "🗑️  Deleted." . PHP_EOL;
 export function sdkCli(tableName, ki, region) {
     const pkCli = ki.pkName;
     const skCli = ki.skName;
-    const pkVal = ki.pkType === 'N' ? '{"N":"1"}' : '{"S":"example-id"}';
-    const skVal = skCli ? (ki.skType === 'N' ? '{"N":"1"}' : '{"S":"v1"}') : null;
-    const keyExpr = `'{"${pkCli}": ${pkVal}${skCli ? `, "${skCli}": ${skVal}` : ''}}'`;
 
     return {
         'README.md': `# ${tableName} — AWS CLI Scripts
@@ -1827,10 +1804,5 @@ export async function downloadSdk(lang, tableName, ki, region) {
     }
 
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `${rootFolder}-${lang}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `${rootFolder}-${lang}.zip`);
 }

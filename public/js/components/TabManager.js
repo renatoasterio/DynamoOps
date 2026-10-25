@@ -1,7 +1,8 @@
 import { $ } from '../utils/dom.js';
 import { state, config } from '../state/store.js';
 import { showToast } from '../utils/toast.js';
-import { api } from '../api/apiClient.js';
+import { tableApi } from '../api/apiClient.js';
+import { escapeHtml } from '../utils/html.js';
 
 export function initTabManager() {
     const tabBar = $('#tab-bar');
@@ -59,7 +60,7 @@ export async function openTab(tableName) {
     
     // Auto-execute scan for new tab
     try {
-        const result = await api('GET', `/tables/${tableName}`, null, { connection: newTab.connection });
+        const result = await tableApi('GET', '', null, { table: tableName, connection: newTab.connection });
         const tableInfo = result.table;
         newTab.tableInfo = tableInfo;
         
@@ -160,11 +161,6 @@ export function closeTab(tabId) {
     }
 }
 
-export function getActiveTabConnection() {
-    const activeTab = state.tabs.find(t => t.id === state.activeTabId);
-    return activeTab ? activeTab.connection : config;
-}
-
 function renderTabs() {
     const tabBar = $('#tab-bar');
     if (!tabBar) return;
@@ -179,7 +175,7 @@ function renderTabs() {
     tabBar.innerHTML = state.tabs.map(tab => `
         <div class="tab-item ${tab.id === state.activeTabId ? 'active' : ''}" data-id="${tab.id}">
             <span class="tab-icon">📊</span>
-            <span class="tab-title" title="${tab.table}">${tab.table}</span>
+            <span class="tab-title" title="${escapeHtml(tab.table)}">${escapeHtml(tab.table)}</span>
             <span class="tab-close">✕</span>
         </div>
     `).join('');

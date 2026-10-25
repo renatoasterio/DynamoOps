@@ -1,6 +1,6 @@
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { connectedApi, tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
 import { resetDataViewer } from './DataViewer.js';
 import { executeQuery } from './QueryPanel.js';
@@ -84,7 +84,7 @@ export function initTableManager() {
         dom.ctError.classList.add('hidden');
 
         try {
-            await api('POST', '/tables', { TableName, PartitionKeyName, PartitionKeyType, SortKeyName, SortKeyType });
+            await connectedApi('POST', '/tables', { TableName, PartitionKeyName, PartitionKeyType, SortKeyName, SortKeyType });
             showToast(`Creating table ${TableName}...`, 'success');
             closeCreateTableModal();
             setTimeout(loadTables, 1500);
@@ -128,7 +128,7 @@ export function initTableManager() {
         dom.dtError.classList.add('hidden');
 
         try {
-            await api('DELETE', `/tables/${state.currentTable}`);
+            await tableApi('DELETE');
             showToast(`Table ${state.currentTable} deleted successfully`, 'success');
             closeDeleteTableModal();
             resetDataViewer();
@@ -176,7 +176,7 @@ export function initTableManager() {
         dom.ttDeletedCount.textContent = '...';
 
         try {
-            const result = await api('POST', `/tables/${state.currentTable}/truncate`);
+            const result = await tableApi('POST', '/truncate');
             dom.ttDeletedCount.textContent = result.deletedCount;
             showToast(`Table ${state.currentTable} truncated. Deleted ${result.deletedCount} items.`, 'warning');
             

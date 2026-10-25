@@ -3,6 +3,8 @@ import { state } from '../state/store.js';
 import { config } from '../state/store.js';
 import { showToast } from '../utils/toast.js';
 import { downloadSdk } from './SdkGenerator.js';
+import { escapeHtml } from '../utils/html.js';
+import { copyText } from '../utils/clipboard.js';
 
 let currentLang = 'nodejs';
 let currentMode = 'current'; // 'current' | 'crud'
@@ -37,9 +39,7 @@ export function initCodeGenerator() {
     $('#code-gen-copy-btn')?.addEventListener('click', () => {
         const code = $('#code-gen-output')?.textContent;
         if (code) {
-            navigator.clipboard.writeText(code)
-                .then(() => showToast('Code copied!', 'success'))
-                .catch(() => showToast('Copy failed', 'error'));
+            copyText(code, 'Code copied!');
         }
     });
 
@@ -152,7 +152,7 @@ function renderCode() {
     const hintEl = $('#code-gen-hint-text');
     if (hintEl) {
         hintEl.innerHTML = currentMode === 'crud'
-            ? `Full example · <strong>PK</strong>: ${ki.pkName}${ki.skName ? ` · <strong>SK</strong>: ${ki.skName}` : ''}`
+            ? `Full example · <strong>PK</strong>: ${escapeHtml(ki.pkName)}${ki.skName ? ` · <strong>SK</strong>: ${escapeHtml(ki.skName)}` : ''}`
             : `Reflects the current query · <strong>double-click</strong> a cell to edit inline`;
     }
 
@@ -771,7 +771,6 @@ if __name__ == '__main__':
 function genJavaCrud({ pkName, pkType, skName, skType }, table, region) {
     const pkAttr  = _javaAttrVal(pkType, 'pk-value');
     const skLine  = skName ? `            "${skName}", ${_javaAttrVal(skType, 'sk-value')}` : '';
-    const keyMapExtra = skLine ? `,\n${skLine}` : '';
     return `// ── Full CRUD: ${table} ─────────────────────────────────────────────────
 // Maven: software.amazon.awssdk:dynamodb:2.x
 import software.amazon.awssdk.regions.Region;
@@ -1164,8 +1163,6 @@ deleteItem($client, $TABLE, $key);`;
 }
 
 function genCliCrud({ pkName, pkType, skName, skType }, table, region) {
-    const pkCliVal = pkType === 'N' ? `'{"N":"1"}'` : `'{"S":"pk-value"}'`;
-    const skCliLine = skName ? `\n  "${skName}": {"${skType === 'N' ? 'N' : 'S'}": "${skType === 'N' ? '1' : 'sk-value'}"}` : '';
     const keyJson = `'{"${pkName}":{"${pkType === 'N' ? 'N' : 'S'}":"${pkType === 'N' ? '1' : 'pk-value'}"}${skName ? `,"${skName}":{"${skType === 'N' ? 'N' : 'S'}":"${skType === 'N' ? '1' : 'sk-value'}"}` : ""}}'`;
     return `# ── Full CRUD: ${table} ─────────────────────────────────────────────────
 # Substitua os valores de chave antes de executar
@@ -1233,7 +1230,6 @@ function _buildKeyCondition(ctx) {
 
 function _j(obj) { return JSON.stringify(obj); }
 
-function _indent(s) { return s.split('\n').map((l, i) => i === 0 ? l : '  ' + l).join('\n'); }
 
 // Per-language primitive helpers
 function _jsVal(t)   { return t === 'N' ? '1'           : '"pk-value"'; }

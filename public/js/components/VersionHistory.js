@@ -1,49 +1,41 @@
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { showToast } from '../utils/toast.js';
+import { escapeHtml } from '../utils/html.js';
+import { loadJSON, saveJSON } from '../utils/storage.js';
+import { getKeyNames } from '../utils/keySchema.js';
 
 const MAX_VERSIONS = 20;
 const STORAGE_PREFIX = 'dynamo-versions';
 
 // ── Storage ───────────────────────────────────────────────────────────────────
-function storageKey(table, pkValue) {
-    return `${STORAGE_PREFIX}-${table}-${String(pkValue).slice(0, 64)}`;
+// One history per item, keyed by its primary-key values
+function storageKey(table, item) {
+    const pkValue = getKeyNames().map(k => JSON.stringify(item[k])).join('|') || JSON.stringify(item).slice(0, 64);
+    return `${STORAGE_PREFIX}-${table}-${pkValue.slice(0, 64)}`;
 }
 
 export function saveVersion(table, item) {
     if (!table || !item) return;
 
-    // Derive a stable key from PK attributes
-    const keys = state.tableInfo?.KeySchema?.map(k => k.AttributeName) || [];
-    const pkValue = keys.map(k => JSON.stringify(item[k])).join('|') || JSON.stringify(item).slice(0, 64);
-
-    const key      = storageKey(table, pkValue);
+    const key      = storageKey(table, item);
     const existing = getVersionsRaw(key);
 
     const entry = { ts: new Date().toISOString(), item: JSON.parse(JSON.stringify(item)) };
     const updated = [entry, ...existing].slice(0, MAX_VERSIONS);
 
-    try {
-        localStorage.setItem(key, JSON.stringify(updated));
-    } catch {
-        // Storage quota — clear old entries
+    if (!saveJSON(key, updated)) {
+        // Storage quota — clear old entries and keep only this version
         clearOldVersionEntries();
-        localStorage.setItem(key, JSON.stringify([entry]));
+        saveJSON(key, [entry]);
     }
 }
 
 function getVersionsRaw(key) {
-    try {
-        return JSON.parse(localStorage.getItem(key) || '[]');
-    } catch {
-        return [];
-    }
+    return loadJSON(key, []);
 }
 
 export function getVersions(table, item) {
-    const keys = state.tableInfo?.KeySchema?.map(k => k.AttributeName) || [];
-    const pkValue = keys.map(k => JSON.stringify(item[k])).join('|') || JSON.stringify(item).slice(0, 64);
-    return getVersionsRaw(storageKey(table, pkValue));
+    return getVersionsRaw(storageKey(table, item));
 }
 
 function clearOldVersionEntries() {
@@ -58,7 +50,6 @@ function clearOldVersionEntries() {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
-let currentItem     = null;
 let selectedVersion = null;
 
 export function initVersionHistory() {
@@ -87,7 +78,6 @@ export function initVersionHistory() {
 function openModal(item) {
     if (!state.currentTable || !item) return;
 
-    currentItem     = item;
     selectedVersion = null;
 
     const versions = getVersions(state.currentTable, item);
@@ -100,7 +90,7 @@ function openModal(item) {
 
 function closeModal() {
     $('#version-history-overlay')?.classList.add('hidden');
-    currentItem = selectedVersion = null;
+    selectedVersion = null;
 }
 
 function renderVersionList(versions, currentItemData) {
@@ -177,9 +167,9 @@ function renderDiff(oldItem, newItem) {
 
 function diffRow(key, oldVal, newVal, cls) {
     return `<div class="diff-row ${cls}">
-        <span class="diff-key">${escHtml(key)}</span>
-        <span class="diff-old">${oldVal !== null ? `<code>${escHtml(oldVal)}</code>` : '<em class="diff-nil">—</em>'}</span>
-        <span class="diff-new">${newVal !== null ? `<code>${escHtml(newVal)}</code>` : '<em class="diff-nil">—</em>'}</span>
+        <span class="diff-key">${escapeHtml(key)}</span>
+        <span class="diff-old">${oldVal !== null ? `<code>${escapeHtml(oldVal)}</code>` : '<em class="diff-nil">—</em>'}</span>
+        <span class="diff-new">${newVal !== null ? `<code>${escapeHtml(newVal)}</code>` : '<em class="diff-nil">—</em>'}</span>
     </div>`;
 }
 
@@ -200,6 +190,3 @@ function diffSummary(oldObj, newObj) {
     return changes;
 }
 
-function escHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}

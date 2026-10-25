@@ -3,7 +3,9 @@ import { api } from '../api/apiClient.js';
 import { state, config } from '../state/store.js';
 import { showToast } from '../utils/toast.js';
 import { loadTables } from './Sidebar.js';
-import { initSsoLogin, handleSsoSubmit, connectSsoProfile, prefillSso, resetSsoFlow, submitLabel as ssoSubmitLabel } from './SsoLogin.js';
+import { initSsoLogin, handleSsoSubmit, connectSsoProfile, resetSsoFlow, submitLabel as ssoSubmitLabel } from './SsoLogin.js';
+import { escapeHtml } from '../utils/html.js';
+import { loadJSON, saveJSON } from '../utils/storage.js';
 
 // ─── Env tag helpers ──────────────────────────────────────────────────────────
 function getEnvPickerValue(pickerId) {
@@ -176,27 +178,6 @@ export function initLoginManager() {
         });
     }
 
-    // Listen for profile requests from Sidebar/Header
-    document.addEventListener('requestAssumeRole', (e) => {
-        const p = e.detail;
-        showLogin();
-        switchTab('assume');
-        if (dom.arRole) dom.arRole.value = p.roleArn || '';
-        if (dom.arSession) dom.arSession.value = p.sessionName || '';
-        if (dom.arRegion) dom.arRegion.value = p.region || 'us-east-1';
-        if (dom.arProfile) dom.arProfile.value = p.awsProfile || 'default';
-        // Populate the Account ID + Role Name helper fields
-        if (p.roleArn) {
-            const parsed = parseRoleArn(p.roleArn);
-            if (parsed) {
-                if (dom.arAccountId) dom.arAccountId.value = parsed.accountId;
-                if (dom.arRoleName) dom.arRoleName.value = parsed.roleName;
-            }
-        }
-        if (p.envTag) setEnvPicker('#login-ar-env-picker', p.envTag);
-        showToast('Assume Role profile details loaded. Click Connect to proceed.', 'info');
-    });
-
     // AWS SSO (IAM Identity Center) sign-in via browser
     initSsoLogin({
         resetPreviousSession,
@@ -204,13 +185,6 @@ export function initLoginManager() {
         setEnvPicker,
         onConnected: finishSsoConnect,
     });
-    document.addEventListener('requestSsoLogin', (e) => {
-        showLogin();
-        switchTab('sso');
-        prefillSso(e.detail || {});
-        showToast('SSO profile loaded. Click "Sign in with AWS in browser".', 'info');
-    });
-
     // Handle profiles update event
     document.addEventListener('profilesUpdated', () => {
         if (activeTab === 'profiles') renderLoginProfiles();
@@ -258,11 +232,19 @@ function switchTab(tabId) {
     }
 }
 
-function getRecentConnections() {
-    try {
-        return JSON.parse(localStorage.getItem('dynamo-gui-recent') || '[]');
-    } catch { return []; }
+const PROFILES_KEY = 'dynamo-gui-profiles';
+const RECENT_KEY = 'dynamo-gui-recent';
+
+const getProfiles = () => loadJSON(PROFILES_KEY, {});
+
+function saveProfile(name, profile) {
+    const profiles = getProfiles();
+    if (profile) profiles[name] = profile; else delete profiles[name];
+    saveJSON(PROFILES_KEY, profiles);
+    document.dispatchEvent(new CustomEvent('profilesUpdated'));
 }
+
+const getRecentConnections = () => loadJSON(RECENT_KEY, []);
 
 function trackRecentConnection(params) {
     let recent = getRecentConnections();
@@ -272,7 +254,7 @@ function trackRecentConnection(params) {
     recent = recent.filter(r => r.id !== id);
     recent.unshift({ ...params, id, timestamp: Date.now() });
     recent = recent.slice(0, 5);
-    localStorage.setItem('dynamo-gui-recent', JSON.stringify(recent));
+    saveJSON(RECENT_KEY, recent);
 }
 
 // ─── Role History (per-tab assume-role history) ───────────────────────────────
@@ -280,7 +262,7 @@ function trackRecentConnection(params) {
 const ROLE_HISTORY_KEY = 'dynamo-gui-role-history';
 
 function getRoleHistory() {
-    try { return JSON.parse(localStorage.getItem(ROLE_HISTORY_KEY) || '[]'); } catch { return []; }
+    return loadJSON(ROLE_HISTORY_KEY, []);
 }
 
 function addRoleHistory(entry) {
@@ -289,7 +271,7 @@ function addRoleHistory(entry) {
     history = history.filter(h => !(h.roleArn === entry.roleArn && h.awsProfile === entry.awsProfile));
     history.unshift({ ...entry, timestamp: Date.now() });
     history = history.slice(0, 10);
-    localStorage.setItem(ROLE_HISTORY_KEY, JSON.stringify(history));
+    saveJSON(ROLE_HISTORY_KEY, history);
 }
 
 function renderRoleHistory() {
@@ -305,11 +287,11 @@ function renderRoleHistory() {
         const parsed   = parseRoleArn(h.roleArn);
         const roleName = parsed?.roleName || h.roleArn;
         const accountId = parsed?.accountId || '';
-        const envClass = h.envTag && h.envTag !== 'none' ? ` ar-hist-env-${h.envTag}` : '';
+        const envClass = h.envTag && h.envTag !== 'none' ? ` ar-hist-env-${escapeHtml(h.envTag)}` : '';
         return `
           <button class="ar-hist-item${envClass}" data-idx="${i}" type="button">
-            <span class="ar-hist-role">${roleName}</span>
-            <span class="ar-hist-meta">${accountId}${h.awsProfile !== 'default' ? ' · ' + h.awsProfile : ''}${h.envTag && h.envTag !== 'none' ? ' · ' + h.envTag.toUpperCase() : ''}</span>
+            <span class="ar-hist-role">${escapeHtml(roleName)}</span>
+            <span class="ar-hist-meta">${escapeHtml(accountId)}${h.awsProfile !== 'default' ? ' · ' + escapeHtml(h.awsProfile) : ''}${h.envTag && h.envTag !== 'none' ? ' · ' + escapeHtml(h.envTag.toUpperCase()) : ''}</span>
           </button>`;
     }).join('');
 
@@ -350,7 +332,7 @@ function recentConnectionMeta(r) {
 
 function renderLoginProfiles() {
     if (!dom.profilesList) return;
-    const profiles = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
+    const profiles = getProfiles();
     const recent = getRecentConnections();
     const profileKeys = Object.keys(profiles);
     
@@ -359,10 +341,10 @@ function renderLoginProfiles() {
     if (recent.length > 0) {
         html += '<div class="profile-section-label">Recent Connections</div>';
         html += recent.map(r => `
-            <div class="saved-profile-item-login recent" data-id="${r.id}" data-type="recent">
+            <div class="saved-profile-item-login recent" data-id="${escapeHtml(r.id)}" data-type="recent">
                 <div class="profile-info">
                     <div class="profile-name">${r.sso ? '🌐 AWS SSO' : r.roleArn ? '🛡️ Assume Role' : '⚡ Quick Connect'}</div>
-                    <div class="profile-meta">${r.region} · ${recentConnectionMeta(r)}</div>
+                    <div class="profile-meta">${escapeHtml(`${r.region} · ${recentConnectionMeta(r)}`)}</div>
                 </div>
                 <div class="profile-action">→</div>
             </div>
@@ -374,13 +356,13 @@ function renderLoginProfiles() {
         html += profileKeys.map(name => {
             const p = profiles[name];
             return `
-                <div class="saved-profile-item-login" data-id="${name}" data-type="saved">
+                <div class="saved-profile-item-login" data-id="${escapeHtml(name)}" data-type="saved">
                     <div class="profile-info">
-                        <div class="profile-name">${name}</div>
-                        <div class="profile-meta">${p.sso ? '🌐 ' : p.roleArn ? '🛡️ ' : ''}${p.region} · ${p.sso ? `${p.sso.accountName || p.sso.accountId} / ${p.sso.roleName}` : p.roleArn ? p.roleArn.split('/').pop() : p.awsProfile}</div>
+                        <div class="profile-name">${escapeHtml(name)}</div>
+                        <div class="profile-meta">${p.sso ? '🌐 ' : p.roleArn ? '🛡️ ' : ''}${escapeHtml(`${p.region} · ${p.sso ? `${p.sso.accountName || p.sso.accountId} / ${p.sso.roleName}` : p.roleArn ? p.roleArn.split('/').pop() : p.awsProfile}`)}</div>
                     </div>
                     <div class="profile-actions">
-                        <button type="button" class="profile-delete-login" data-name="${name}" title="Delete saved profile">🗑</button>
+                        <button type="button" class="profile-delete-login" data-name="${escapeHtml(name)}" title="Delete saved profile">🗑</button>
                         <div class="profile-action">⚡</div>
                     </div>
                 </div>
@@ -400,11 +382,8 @@ function renderLoginProfiles() {
             e.stopPropagation();
             const name = btn.dataset.name;
             if (!confirm(`Delete saved profile "${name}"?`)) return;
-            const current = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
-            delete current[name];
-            localStorage.setItem('dynamo-gui-profiles', JSON.stringify(current));
+            saveProfile(name, null);
             showToast(`Profile "${name}" deleted`, 'info');
-            document.dispatchEvent(new CustomEvent('profilesUpdated'));
         });
     });
 
@@ -470,13 +449,10 @@ async function handleConnect() {
 /** Post-connect UI for an SSO session (mirrors assumeRole's success path). */
 function finishSsoConnect(result, p) {
     if (p.save && p.profileName) {
-        const profiles = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
-        profiles[p.profileName] = {
+        saveProfile(p.profileName, {
             sso: { startUrl: p.startUrl, ssoRegion: p.ssoRegion, accountId: p.accountId, accountName: p.accountName, roleName: p.roleName },
             region: p.region, awsProfile: 'sso', envTag: p.envTag,
-        };
-        localStorage.setItem('dynamo-gui-profiles', JSON.stringify(profiles));
-        document.dispatchEvent(new CustomEvent('profilesUpdated'));
+        });
         showToast(`SSO profile "${p.profileName}" saved locally.`, 'info');
     }
     trackRecentConnection({
@@ -605,10 +581,7 @@ async function connectWithParams(region, profile, endpoint, allowSave = false, e
     if (allowSave && dom.saveCheckbox && dom.saveCheckbox.checked) {
         const profileName = dom.profileNameInput ? dom.profileNameInput.value.trim() : null;
         if (profileName) {
-            const profiles = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
-            profiles[profileName] = { region, awsProfile: profile, endpoint, envTag };
-            localStorage.setItem('dynamo-gui-profiles', JSON.stringify(profiles));
-            document.dispatchEvent(new CustomEvent('profilesUpdated'));
+            saveProfile(profileName, { region, awsProfile: profile, endpoint, envTag });
             showToast(`Profile "${profileName}" saved locally.`, 'info');
         }
     }
@@ -653,10 +626,7 @@ async function assumeRole(roleArn, sessionName, region, profile, allowSave = fal
     if (allowSave && dom.arSaveCheckbox && dom.arSaveCheckbox.checked) {
         const profileName = dom.arNameInput ? dom.arNameInput.value.trim() : null;
         if (profileName) {
-            const profiles = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
-            profiles[profileName] = { roleArn, sessionName, region, awsProfile: profile, envTag };
-            localStorage.setItem('dynamo-gui-profiles', JSON.stringify(profiles));
-            document.dispatchEvent(new CustomEvent('profilesUpdated'));
+            saveProfile(profileName, { roleArn, sessionName, region, awsProfile: profile, envTag });
             showToast(`Assume Role profile "${profileName}" saved locally.`, 'info');
         }
     }
@@ -746,7 +716,7 @@ function _showRenewalPrompt(roleArn, sessionName, region, profile, envTag) {
       <div style="background:var(--bg-elevated);border:1px solid var(--border-strong);border-radius:16px;padding:28px 32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.5)">
         <div style="font-size:32px;margin-bottom:12px">⏰</div>
         <h3 style="color:var(--text-primary);font-size:16px;margin-bottom:8px">Session expiring</h3>
-        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:4px">The <strong style="color:var(--accent)">${roleName}</strong> session expires in less than 5 minutes.</p>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:4px">The <strong style="color:var(--accent)">${escapeHtml(roleName)}</strong> session expires in less than 5 minutes.</p>
         <p style="color:var(--text-muted);font-size:12px;margin-bottom:20px">Renew now to continue without interruption.</p>
         <div style="display:flex;gap:10px;justify-content:center">
           <button id="session-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer">🔄 Renew Session</button>
@@ -760,7 +730,6 @@ function _showRenewalPrompt(roleArn, sessionName, region, profile, envTag) {
 
     document.getElementById('session-renew-btn').addEventListener('click', async () => {
         overlay.remove();
-        const btn = document.getElementById('session-renew-btn');
         try {
             await assumeRole(roleArn, sessionName || 'dev-session', region, profile, false, envTag);
             showToast('Session renewed successfully!', 'success');
@@ -794,7 +763,7 @@ function _showSessionExpiredPrompt(roleArn, sessionName, region, profile, envTag
       <div style="background:var(--bg-elevated);border:1px solid rgba(248,113,113,0.4);border-radius:16px;padding:28px 32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.6)">
         <div style="font-size:32px;margin-bottom:12px">🔒</div>
         <h3 style="color:#f87171;font-size:16px;margin-bottom:8px">Session expired</h3>
-        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">The <strong>${roleName}</strong> session has expired. Renew to continue.</p>
+        <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">The <strong>${escapeHtml(roleName)}</strong> session has expired. Renew to continue.</p>
         <button id="session-expired-renew-btn" style="background:var(--accent-gradient);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;width:100%">🔄 Renew Now</button>
       </div>`;
 

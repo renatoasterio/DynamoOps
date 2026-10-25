@@ -1,8 +1,10 @@
-import { $, $$ } from '../utils/dom.js';
+import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
-import { getActiveTabConnection } from './TabManager.js';
+import { escapeHtml } from '../utils/html.js';
+import { getPkSk } from '../utils/keySchema.js';
+import { fmtNum, fmtBytes } from '../utils/format.js';
 
 export function initGsiManager() {
     // Legacy: delete from schema-info bar ✕ button
@@ -81,8 +83,7 @@ function renderCards(table) {
     const cards = [];
 
     // Primary key
-    const pk = table.KeySchema?.find(k => k.KeyType === 'HASH')?.AttributeName;
-    const sk = table.KeySchema?.find(k => k.KeyType === 'RANGE')?.AttributeName;
+    const { pk, sk } = getPkSk(table.KeySchema);
     cards.push(buildCard({
         name: 'Primary Key',
         type: 'PRIMARY',
@@ -98,8 +99,7 @@ function renderCards(table) {
 
     // LSIs
     (table.LocalSecondaryIndexes || []).forEach(lsi => {
-        const lsiPk = lsi.KeySchema?.find(k => k.KeyType === 'HASH')?.AttributeName;
-        const lsiSk = lsi.KeySchema?.find(k => k.KeyType === 'RANGE')?.AttributeName;
+        const { pk: lsiPk, sk: lsiSk } = getPkSk(lsi.KeySchema);
         cards.push(buildCard({
             name: lsi.IndexName,
             type: 'LSI',
@@ -114,8 +114,7 @@ function renderCards(table) {
 
     // GSIs
     (table.GlobalSecondaryIndexes || []).forEach(gsi => {
-        const gsiPk = gsi.KeySchema?.find(k => k.KeyType === 'HASH')?.AttributeName;
-        const gsiSk = gsi.KeySchema?.find(k => k.KeyType === 'RANGE')?.AttributeName;
+        const { pk: gsiPk, sk: gsiSk } = getPkSk(gsi.KeySchema);
         cards.push(buildCard({
             name: gsi.IndexName,
             type: 'GSI',
@@ -143,7 +142,7 @@ function renderCards(table) {
             // Refresh cards
             if (state.tableInfo) {
                 try {
-                    const { table: t } = await api('GET', `/tables/${state.currentTable}`);
+                    const { table: t } = await tableApi('GET');
                     state.tableInfo = t;
                     renderCards(t);
                 } catch { /* silent */ }
@@ -160,14 +159,14 @@ function buildCard({ name, type, status, pk, sk, typeMap, projection, billingMod
     const pkRow = pk
         ? `<div class="idx-key-row">
             <span class="idx-key-badge pk">PK</span>
-            <span class="idx-key-name">${esc(pk)}</span>
+            <span class="idx-key-name">${escapeHtml(pk)}</span>
             <span class="idx-key-type">${typeMap[pk] || '?'}</span>
            </div>`
         : '';
     const skRow = sk
         ? `<div class="idx-key-row">
             <span class="idx-key-badge sk">SK</span>
-            <span class="idx-key-name">${esc(sk)}</span>
+            <span class="idx-key-name">${escapeHtml(sk)}</span>
             <span class="idx-key-type">${typeMap[sk] || '?'}</span>
            </div>`
         : `<span class="idx-muted">No sort key</span>`;
@@ -176,9 +175,9 @@ function buildCard({ name, type, status, pk, sk, typeMap, projection, billingMod
     const projType = projection?.ProjectionType || projection?.projectionType || 'ALL';
     const nonKeys  = projection?.NonKeyAttributes || projection?.nonKeyAttributes || [];
     const projHtml = projType === 'INCLUDE' && nonKeys.length
-        ? `<span class="idx-value">${esc(projType)}</span>
-           <div class="idx-tag-list">${nonKeys.map(a => `<span class="idx-tag">${esc(a)}</span>`).join('')}</div>`
-        : `<span class="idx-value">${esc(projType)}</span>`;
+        ? `<span class="idx-value">${escapeHtml(projType)}</span>
+           <div class="idx-tag-list">${nonKeys.map(a => `<span class="idx-tag">${escapeHtml(a)}</span>`).join('')}</div>`
+        : `<span class="idx-value">${escapeHtml(projType)}</span>`;
 
     // Throughput / size section
     let metaHtml = '';
@@ -192,7 +191,7 @@ function buildCard({ name, type, status, pk, sk, typeMap, projection, billingMod
     if (sizeBytes != null) metaHtml += `<span class="idx-muted">${fmtBytes(sizeBytes)} · ${fmtNum(itemCount ?? 0)} items</span>`;
 
     const deleteBtn = deletable
-        ? `<button class="idx-card-delete-btn" data-name="${esc(name)}">
+        ? `<button class="idx-card-delete-btn" data-name="${escapeHtml(name)}">
                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                Delete
            </button>`
@@ -201,7 +200,7 @@ function buildCard({ name, type, status, pk, sk, typeMap, projection, billingMod
     return `
         <div class="idx-card">
             <div class="idx-card-header">
-                <span class="idx-card-name" title="${esc(name)}">${esc(name)}</span>
+                <span class="idx-card-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
                 <span class="idx-type-badge ${typeClass}">${type}</span>
                 <span class="idx-status-badge ${statusClass}">${status}</span>
                 ${deleteBtn}
@@ -249,15 +248,12 @@ async function handleCreate() {
     submitBtn.innerHTML = '<span class="spinner"></span> Creating…';
 
     try {
-        await api('POST', `/tables/${state.currentTable}/gsi`, {
-            indexName, pkName, pkType, skName, skType, projection, nonKeyAttrs,
-            connection: getActiveTabConnection()
-        });
+        await tableApi('POST', '/gsi', { indexName, pkName, pkType, skName, skType, projection, nonKeyAttrs });
         showToast(`GSI "${indexName}" creation started — may take a few minutes.`, 'success');
         document.dispatchEvent(new CustomEvent('reloadTableInfoRequest'));
         // Reload table info and refresh cards
         try {
-            const { table } = await api('GET', `/tables/${state.currentTable}`);
+            const { table } = await tableApi('GET');
             state.tableInfo = table;
             renderCards(table);
         } catch { /* silent */ }
@@ -274,9 +270,7 @@ async function handleCreate() {
 export async function deleteGsi(indexName) {
     if (!state.currentTable) return;
     try {
-        await api('DELETE', `/tables/${state.currentTable}/gsi/${encodeURIComponent(indexName)}`, null, {
-            connection: getActiveTabConnection()
-        });
+        await tableApi('DELETE', `/gsi/${encodeURIComponent(indexName)}`);
         showToast(`GSI "${indexName}" deletion started.`, 'warning');
         document.dispatchEvent(new CustomEvent('reloadTableInfoRequest'));
     } catch (err) {
@@ -294,18 +288,4 @@ function resetCreateForm() {
     $('#indexes-create-error')?.classList.add('hidden');
 }
 
-function fmtNum(n) { return Number(n).toLocaleString(); }
 
-function fmtBytes(b) {
-    if (!b) return '0 B';
-    const u = ['B','KB','MB','GB','TB'];
-    const i = Math.floor(Math.log(b) / Math.log(1024));
-    return `${(b / Math.pow(1024, i)).toFixed(1)} ${u[i]}`;
-}
-
-function esc(s) {
-    if (s == null) return '';
-    const d = document.createElement('div');
-    d.textContent = String(s);
-    return d.innerHTML;
-}

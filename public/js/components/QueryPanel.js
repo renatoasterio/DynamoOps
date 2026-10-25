@@ -1,11 +1,12 @@
-import { $, $$ } from '../utils/dom.js';
-import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { $ } from '../utils/dom.js';
+import { state, getActiveTabConnection } from '../state/store.js';
+import { api, tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
 import { addToHistory } from './HistoryManager.js';
-import { getActiveTabConnection } from './TabManager.js';
 import { trackRead, trackWrite, fmtCost, fmtCU } from './CostTracker.js';
 import { initSqlEditor, refreshSqlHighlight, sqlStatementKind, showSqlError, clearSqlError } from './SqlEditor.js';
+import { escapeHtml } from '../utils/html.js';
+import { getPkSk } from '../utils/keySchema.js';
 
 const dom = {
     modeScanBtn: $('#mode-scan-btn'),
@@ -103,43 +104,33 @@ export function syncFilterPanel() {
     dom.filterToggleBtn.setAttribute('aria-expanded', state.filterOpen ? 'true' : 'false');
 }
 
+function showKeyFields(keySchema) {
+    const { pk, sk } = getPkSk(keySchema);
+    dom.queryPkName.value = pk || '';
+    dom.querySkName.value = sk || '';
+    dom.querySkRow.style.display = sk ? 'flex' : 'none';
+}
+
 export function populateQueryFields(table) {
     const keySchema = table.KeySchema || [];
-    const pk = keySchema.find((k) => k.KeyType === 'HASH');
-    const sk = keySchema.find((k) => k.KeyType === 'RANGE');
-
-    dom.queryPkName.value = pk ? pk.AttributeName : '';
-    dom.querySkName.value = sk ? sk.AttributeName : '';
-    dom.querySkRow.style.display = sk ? 'flex' : 'none';
+    showKeyFields(keySchema);
 
     dom.queryIndex.innerHTML = '<option value="">Primary Key</option>';
     const gsis = table.GlobalSecondaryIndexes || [];
     gsis.forEach((gsi) => {
-        dom.queryIndex.innerHTML += `<option value="${gsi.IndexName}">${gsi.IndexName}</option>`;
+        dom.queryIndex.innerHTML += `<option value="${escapeHtml(gsi.IndexName)}">${escapeHtml(gsi.IndexName)}</option>`;
     });
     const lsis = table.LocalSecondaryIndexes || [];
     lsis.forEach((lsi) => {
-        dom.queryIndex.innerHTML += `<option value="${lsi.IndexName}">${lsi.IndexName} (LSI)</option>`;
+        dom.queryIndex.innerHTML += `<option value="${escapeHtml(lsi.IndexName)}">${escapeHtml(lsi.IndexName)} (LSI)</option>`;
     });
 
-    dom.queryIndex.addEventListener('change', () => {
-        const indexName = dom.queryIndex.value;
-        if (!indexName) {
-            dom.queryPkName.value = pk ? pk.AttributeName : '';
-            dom.querySkName.value = sk ? sk.AttributeName : '';
-            dom.querySkRow.style.display = sk ? 'flex' : 'none';
-        } else {
-            const allIndexes = [...gsis, ...lsis];
-            const idx = allIndexes.find((i) => i.IndexName === indexName);
-            if (idx) {
-                const idxPk = idx.KeySchema.find((k) => k.KeyType === 'HASH');
-                const idxSk = idx.KeySchema.find((k) => k.KeyType === 'RANGE');
-                dom.queryPkName.value = idxPk ? idxPk.AttributeName : '';
-                dom.querySkName.value = idxSk ? idxSk.AttributeName : '';
-                dom.querySkRow.style.display = idxSk ? 'flex' : 'none';
-            }
-        }
-    });
+    // onchange (not addEventListener): this runs on every table switch and
+    // must replace the previous table's handler instead of stacking another one
+    dom.queryIndex.onchange = () => {
+        const idx = [...gsis, ...lsis].find((i) => i.IndexName === dom.queryIndex.value);
+        showKeyFields(idx ? idx.KeySchema : keySchema);
+    };
 
     // Only seed allColumns from schema when the tab has no data yet.
     // On tab switch the columns are already restored from the tab state — don't overwrite them.
@@ -261,8 +252,8 @@ function initSqlAutocomplete() {
 
         if (!cached) {
             const load = Promise.all([
-                api('GET', `/tables/${encodeURIComponent(table)}`, null, { connection }),
-                api('POST', `/tables/${encodeURIComponent(table)}/scan`, { limit: 50 }, { connection }),
+                tableApi('GET', '', null, { table, connection }),
+                tableApi('POST', '/scan', { limit: 50 }, { table, connection }),
             ]).then(([desc, sample]) => {
                 const attrs = (sample.items || []).flatMap(Object.keys);
                 columnCache.set(cacheKey, buildColumnInfo(desc.table, attrs));
@@ -408,18 +399,13 @@ function initSqlAutocomplete() {
     }
 
     // ── Highlight matched portion ───────────────────────────────────
-    function esc(s) {
-        const d = document.createElement('span');
-        d.textContent = s;
-        return d.innerHTML;
-    }
     function highlight(text, query) {
-        if (!query) return esc(text);
+        if (!query) return escapeHtml(text);
         const idx = text.toUpperCase().indexOf(query.toUpperCase());
-        if (idx < 0) return esc(text);
-        return esc(text.slice(0, idx))
-             + `<mark class="ac-match">${esc(text.slice(idx, idx + query.length))}</mark>`
-             + esc(text.slice(idx + query.length));
+        if (idx < 0) return escapeHtml(text);
+        return escapeHtml(text.slice(0, idx))
+             + `<mark class="ac-match">${escapeHtml(text.slice(idx, idx + query.length))}</mark>`
+             + escapeHtml(text.slice(idx + query.length));
     }
 
     // ── Render dropdown ─────────────────────────────────────────────
@@ -435,7 +421,7 @@ function initSqlAutocomplete() {
             li.innerHTML = `
                 <span class="ac-icon ac-icon-${s.type}">${ICONS[s.type] || '•'}</span>
                 <span class="ac-text">${highlight(s.text, query)}</span>
-                ${s.hint ? `<span class="ac-hint">${esc(s.hint)}</span>` : ''}
+                ${s.hint ? `<span class="ac-hint">${escapeHtml(s.hint)}</span>` : ''}
                 <span class="ac-badge ac-badge-${s.type}">${TYPE_LABELS[s.type] || s.type}</span>
             `;
             li.addEventListener('mousedown', e => {
@@ -767,7 +753,7 @@ export async function executeQuery(append = false, forcedStartKey) {
             const qStartKey = forcedStartKey !== undefined ? forcedStartKey : (append ? state.lastEvaluatedKey : null);
             if (qStartKey) params.exclusiveStartKey = qStartKey;
 
-            result = await api('POST', `/tables/${state.currentTable}/query`, params, { connection });
+            result = await tableApi('POST', '/query', params, { connection });
             if (!append) addToHistory('query', params);
         } else if (state.queryMode === 'sql') {
             const statement = (sqlOverrideStatement || dom.sqlStatement.value).trim();
@@ -841,7 +827,7 @@ export async function executeQuery(append = false, forcedStartKey) {
             const startKey = forcedStartKey !== undefined ? forcedStartKey : (append ? state.lastEvaluatedKey : null);
             if (startKey) params.exclusiveStartKey = startKey;
 
-            result = await api('POST', `/tables/${state.currentTable}/scan`, params, { connection });
+            result = await tableApi('POST', '/scan', params, { connection });
             if (!append) addToHistory('scan', params);
         }
 

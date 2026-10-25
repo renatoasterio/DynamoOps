@@ -5,6 +5,8 @@
 import { $ } from '../utils/dom.js';
 import { api } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
+import { escapeHtml } from '../utils/html.js';
+import { loadJSON, saveJSON } from '../utils/storage.js';
 
 const LAST_KEY = 'dynamo-gui-sso-last';
 
@@ -64,8 +66,6 @@ function setStep(next) {
     }
 }
 
-export function getSsoStep() { return step; }
-
 function showError(msg) {
     if (!dom.error) return;
     dom.error.textContent = msg;
@@ -80,18 +80,14 @@ function stopPolling() {
 }
 
 function rememberLast(extra = {}) {
-    try {
-        localStorage.setItem(LAST_KEY, JSON.stringify({
-            startUrl: dom.startUrl?.value.trim(),
-            ssoRegion: dom.ssoRegion?.value,
-            region: dom.dbRegion?.value,
-            ...extra,
-        }));
-    } catch { /* ignore */ }
+    saveJSON(LAST_KEY, {
+        startUrl: dom.startUrl?.value.trim(),
+        ssoRegion: dom.ssoRegion?.value,
+        region: dom.dbRegion?.value,
+        ...extra,
+    });
 }
-function readLast() {
-    try { return JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch { return null; }
-}
+const readLast = () => loadJSON(LAST_KEY, null);
 
 /** Fills the form (from a saved profile, ~/.aws/config chip or last use). */
 export function prefillSso(p = {}) {
@@ -117,7 +113,7 @@ async function loadConfigChips() {
         const { profiles } = await api('GET', '/sso/config');
         if (!profiles?.length) { dom.chips.classList.add('hidden'); return; }
         dom.chips.innerHTML = `<span class="sso-chips-label">From ~/.aws/config:</span>` + profiles.map((p, i) => `
-            <button type="button" class="sso-chip" data-idx="${i}" title="${p.startUrl}${p.accountId ? ` · ${p.accountId}` : ''}${p.roleName ? ` / ${p.roleName}` : ''}">${p.profile}</button>`).join('');
+            <button type="button" class="sso-chip" data-idx="${i}" title="${escapeHtml(`${p.startUrl}${p.accountId ? ` · ${p.accountId}` : ''}${p.roleName ? ` / ${p.roleName}` : ''}`)}">${escapeHtml(p.profile)}</button>`).join('');
         dom.chips.classList.remove('hidden');
         dom.chips.querySelectorAll('.sso-chip').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -259,10 +255,6 @@ export async function connectSsoProfile(p) {
     prefillSso(p);
     autoConnect = true;
     await startFlow();
-}
-
-function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 export function initSsoLogin(context = {}) {

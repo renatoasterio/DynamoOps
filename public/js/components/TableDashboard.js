@@ -1,23 +1,11 @@
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
-import { getActiveTabConnection } from './TabManager.js';
+import { escapeHtml } from '../utils/html.js';
+import { fmtNum, fmtBytes } from '../utils/format.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtBytes(b) {
-    if (b == null) return '—';
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 ** 2) return `${(b / 1024).toFixed(1)} KB`;
-    if (b < 1024 ** 3) return `${(b / 1024 ** 2).toFixed(1)} MB`;
-    return `${(b / 1024 ** 3).toFixed(2)} GB`;
-}
-
-function fmtNum(n) {
-    if (n == null) return '—';
-    return Number(n).toLocaleString();
-}
 
 function fmtDate(d) {
     if (!d) return '—';
@@ -64,8 +52,8 @@ function alarmBadge(a) {
     const c = colors[a.state] || '#888';
     return `<div class="dash-alarm-item">
       <span class="dash-alarm-dot" style="background:${c}"></span>
-      <span class="dash-alarm-name">${a.name}</span>
-      <span class="dash-alarm-state" style="color:${c}">${a.state}</span>
+      <span class="dash-alarm-name">${escapeHtml(a.name)}</span>
+      <span class="dash-alarm-state" style="color:${c}">${escapeHtml(a.state)}</span>
     </div>`;
 }
 
@@ -84,7 +72,7 @@ function renderDashboard(data) {
         <div class="dash-stats-grid">
           <div class="dash-stat">
             <div class="dash-stat-label">Status</div>
-            <div class="dash-stat-value" style="color:${statusColor(data.status)}">${data.status}</div>
+            <div class="dash-stat-value" style="color:${statusColor(data.status)}">${escapeHtml(data.status)}</div>
           </div>
           <div class="dash-stat">
             <div class="dash-stat-label">Item Count</div>
@@ -141,7 +129,7 @@ function renderDashboard(data) {
               const roleLabel = k.KeyType === 'HASH' ? 'Partition Key' : 'Sort Key';
               const roleColor = k.KeyType === 'HASH' ? '#6366f1' : '#a78bfa';
               return `<div class="dash-key-item">
-                <span class="dash-key-name">${k.AttributeName}</span>
+                <span class="dash-key-name">${escapeHtml(k.AttributeName)}</span>
                 <span class="dash-key-type">${typeLabel}</span>
                 <span class="dash-key-role" style="color:${roleColor}">${roleLabel}</span>
               </div>`;
@@ -214,11 +202,10 @@ async function loadDashboard() {
     body.innerHTML = '<div class="dash-loading">⏳ Loading metrics…</div>';
 
     try {
-        const connection = getActiveTabConnection();
-        const data = await api('GET', `/tables/${state.currentTable}/dashboard`, null, { connection });
+        const data = await tableApi('GET', '/dashboard');
         renderDashboard(data);
     } catch (err) {
-        body.innerHTML = `<div class="dash-error">Failed to load metrics: ${err.message}</div>`;
+        body.innerHTML = `<div class="dash-error">Failed to load metrics: ${escapeHtml(err.message)}</div>`;
         showToast('Failed to load dashboard', 'error');
     }
 }

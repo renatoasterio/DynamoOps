@@ -8,25 +8,16 @@
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
 import { showToast } from '../utils/toast.js';
+import { escapeHtml } from '../utils/html.js';
+import { loadJSON, saveJSON, removeKey } from '../utils/storage.js';
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = (tableName) => `dynamo_template_${tableName}`;
 
-export function getTemplate(tableName) {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY(tableName));
-        return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-}
-
-function saveTemplate(tableName, fields) {
-    localStorage.setItem(STORAGE_KEY(tableName), JSON.stringify(fields));
-}
-
-function deleteTemplate(tableName) {
-    localStorage.removeItem(STORAGE_KEY(tableName));
-}
+export const getTemplate = (tableName) => loadJSON(STORAGE_KEY(tableName), null);
+const saveTemplate = (tableName, fields) => saveJSON(STORAGE_KEY(tableName), fields);
+const deleteTemplate = (tableName) => removeKey(STORAGE_KEY(tableName));
 
 // ─── Build a JSON object from template + form values ─────────────────────────
 
@@ -180,7 +171,7 @@ function fieldRowHTML(f, i) {
 
     return `<div class="tpl-field-row ${f.isKey ? 'tpl-key-row' : ''}" draggable="true">
       <span class="tpl-drag-handle" title="Drag to reorder">⠿</span>
-      <input class="tpl-fname" type="text" placeholder="field name" value="${escHtml(f.name)}" ${f.isKey ? 'readonly' : ''}/>
+      <input class="tpl-fname" type="text" placeholder="field name" value="${escapeHtml(f.name)}" ${f.isKey ? 'readonly' : ''}/>
       <select class="tpl-ftype" ${f.isKey ? 'disabled' : ''}>${typeOptions}</select>
       ${defaultInputHTML(f)}
       <label class="tpl-req-label" title="Required field">
@@ -200,11 +191,7 @@ function defaultInputHTML(f) {
         </select>`;
     }
     if (f.type === 'NULL') return `<input class="tpl-fdefault" type="text" placeholder="null" disabled value=""/>`;
-    return `<input class="tpl-fdefault" type="text" placeholder="default" value="${escHtml(f.defaultValue || '')}"/>`;
-}
-
-function escHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    return `<input class="tpl-fdefault" type="text" placeholder="default" value="${escapeHtml(f.defaultValue || '')}"/>`;
 }
 
 // ─── Template insert form (rendered inside item modal) ────────────────────────
@@ -218,21 +205,21 @@ export function buildTemplateFormHTML(tableName) {
         const typeLabel = { S: 'String', N: 'Number', BOOL: 'Boolean', NULL: 'Null', L: 'List', M: 'Map' }[f.type] || f.type;
         let input;
         if (f.type === 'BOOL') {
-            input = `<select class="tpl-field-input form-input" data-name="${escHtml(f.name)}" data-type="BOOL">
+            input = `<select class="tpl-field-input form-input" data-name="${escapeHtml(f.name)}" data-type="BOOL">
               <option value="">—</option>
               <option value="true">true</option>
               <option value="false">false</option>
             </select>`;
         } else if (f.type === 'NULL') {
-            input = `<input class="tpl-field-input form-input" type="text" data-name="${escHtml(f.name)}" data-type="NULL" value="null" disabled/>`;
+            input = `<input class="tpl-field-input form-input" type="text" data-name="${escapeHtml(f.name)}" data-type="NULL" value="null" disabled/>`;
         } else {
             const ph = f.type === 'L' ? '["value1","value2"]' : f.type === 'M' ? '{"key":"value"}' : (f.defaultValue || '');
             input = `<input class="tpl-field-input form-input" type="${f.type === 'N' ? 'number' : 'text'}"
-              data-name="${escHtml(f.name)}" data-type="${f.type}"
-              placeholder="${escHtml(ph)}" value="${escHtml(f.defaultValue || '')}"/>`;
+              data-name="${escapeHtml(f.name)}" data-type="${f.type}"
+              placeholder="${escapeHtml(ph)}" value="${escapeHtml(f.defaultValue || '')}"/>`;
         }
-        return `<div class="tpl-field-row" data-field-name="${escHtml(f.name)}" data-field-type="${f.type}" ${f.required ? 'data-required="1"' : ''}>
-          <label class="tpl-form-label">${escHtml(f.name)} ${required}<span class="tpl-form-type">${typeLabel}</span></label>
+        return `<div class="tpl-field-row" data-field-name="${escapeHtml(f.name)}" data-field-type="${f.type}" ${f.required ? 'data-required="1"' : ''}>
+          <label class="tpl-form-label">${escapeHtml(f.name)} ${required}<span class="tpl-form-type">${typeLabel}</span></label>
           ${input}
         </div>`;
     }).join('');

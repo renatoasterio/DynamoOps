@@ -1,5 +1,7 @@
 import { $ } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
+import { escapeHtml } from '../utils/html.js';
+import { loadJSON, saveJSON, removeKey } from '../utils/storage.js';
 
 // ─── Pricing (on-demand, us-east-1, standard table class) ────────────────────
 // The tracker sums the ConsumedCapacity DynamoDB reports per request, so the
@@ -26,15 +28,11 @@ const session = {
     history: [],                 // last 200 operations
 };
 
+const SETTINGS_KEY = 'costTracker';
+
 export function initCostTracker() {
     // Load persisted settings
-    const saved = localStorage.getItem('costTracker');
-    if (saved) {
-        try {
-            const parsed = JSON.parse(saved);
-            session.alertThreshold = parsed.alertThreshold ?? null;
-        } catch { /* ignore */ }
-    }
+    session.alertThreshold = loadJSON(SETTINGS_KEY, {}).alertThreshold ?? null;
 
     _bindUI();
 }
@@ -60,6 +58,18 @@ export function trackRead(tableName, consumedCapacity, opType, durationMs, itemC
     _checkThreshold();
     _refreshPanel();
     return { rcu, cost };
+}
+
+/**
+ * Runs a write request and records its consumed capacity, duration and size.
+ * `itemCount` may be a number or a function of the result (e.g. deleted count).
+ */
+export async function trackedWrite(tableName, opType, itemCount, request) {
+    const started = Date.now();
+    const result = await request();
+    const count = typeof itemCount === 'function' ? itemCount(result) : itemCount;
+    trackWrite(tableName, result?.consumedCapacity, opType, Date.now() - started, count);
+    return result;
 }
 
 /**
@@ -174,7 +184,7 @@ function _bindUI() {
         }
         session.alertThreshold = val;
         session.alertFired = false;
-        localStorage.setItem('costTracker', JSON.stringify({ alertThreshold: val }));
+        saveJSON(SETTINGS_KEY, { alertThreshold: val });
         showToast(`Cost alert set at ${fmtCost(val)}`, 'success');
         _checkThreshold();
         _refreshPanel();
@@ -185,7 +195,7 @@ function _bindUI() {
         session.alertFired = false;
         const input = $('#cost-threshold-input');
         if (input) input.value = '';
-        localStorage.removeItem('costTracker');
+        removeKey(SETTINGS_KEY);
         showToast('Cost alert cleared', 'info');
         _refreshPanel();
     });
@@ -272,7 +282,7 @@ function _renderPerTableBreakdown() {
     const maxCost = tables[0][1].cost || 1;
     el.innerHTML = tables.map(([name, stats]) => `
         <div class="cost-table-row">
-            <div class="cost-table-name" title="${_esc(name)}">${_esc(name)}</div>
+            <div class="cost-table-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
             <div class="cost-table-bar-wrap">
                 <div class="cost-table-bar" style="width:${Math.max(2, (stats.cost / maxCost) * 100).toFixed(1)}%"></div>
             </div>
@@ -312,7 +322,7 @@ function _renderHistory() {
                     const time = new Date(e.ts).toLocaleTimeString();
                     return `<tr>
                         <td><span class="cost-op-badge cost-op-${e.opType}">${opIcon[e.opType] || '⚡'} ${e.opType}</span></td>
-                        <td class="cost-tbl-name" title="${_esc(e.tableName)}">${_esc(e.tableName)}</td>
+                        <td class="cost-tbl-name" title="${escapeHtml(e.tableName)}">${escapeHtml(e.tableName)}</td>
                         <td class="cost-cu-cell">${cu}</td>
                         <td class="cost-cost-cell">${fmtCost(e.cost)}</td>
                         <td>${e.itemCount ?? '—'}</td>
@@ -341,9 +351,3 @@ function _renderThresholdSection() {
     }
 }
 
-function _esc(s) {
-    if (s == null) return '';
-    const d = document.createElement('div');
-    d.textContent = String(s);
-    return d.innerHTML;
-}

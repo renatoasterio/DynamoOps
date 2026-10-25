@@ -6,6 +6,8 @@
 
 import { $ } from '../utils/dom.js';
 import { state } from '../state/store.js';
+import { escapeHtml } from '../utils/html.js';
+import { getPkSk } from '../utils/keySchema.js';
 
 // Active chart sub-tab: 'timeline' | 'distribution' | 'heatmap'
 let activeChart = 'timeline';
@@ -40,8 +42,6 @@ export function initChartView() {
         }, 200);
     });
 }
-
-export function switchToChartView() { switchView('chart'); }
 
 // ─── View switching ───────────────────────────────────────────────────────────
 
@@ -114,12 +114,12 @@ function populateFieldSelectors() {
 
     if (dateSelect) {
         dateSelect.innerHTML = dateFields.length
-            ? dateFields.map(f => `<option value="${f}">${f}</option>`).join('')
+            ? dateFields.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('')
             : '<option value="">No date field found</option>';
     }
     if (numSelect) {
         numSelect.innerHTML = numFields.length
-            ? numFields.map(f => `<option value="${f}">${f}</option>`).join('')
+            ? numFields.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('')
             : '<option value="">No numeric field found</option>';
     }
 }
@@ -161,7 +161,7 @@ function renderTimeline() {
 
     const cw = container.clientWidth - 40; // subtract padding
     container.innerHTML = `
-      <div class="chart-title">Items per ${granularity} · field: <strong>${field}</strong></div>
+      <div class="chart-title">Items per ${granularity} · field: <strong>${escapeHtml(field)}</strong></div>
       ${barChart(entries, { color: '#6366f1', unit: 'items', containerWidth: cw })}
     `;
 }
@@ -208,7 +208,7 @@ function renderDistribution() {
 
     const cw = container.clientWidth - 40;
     container.innerHTML = `
-      <div class="chart-title">Distribution of <strong>${field}</strong></div>
+      <div class="chart-title">Distribution of <strong>${escapeHtml(field)}</strong></div>
       ${stats}
       ${barChart(buckets, { color: '#a78bfa', unit: 'items', rotateLabels: true, containerWidth: cw })}
     `;
@@ -227,8 +227,7 @@ function renderHeatmap() {
     }
 
     // Find PK
-    const pkAttr = state.tableInfo?.KeySchema?.find(k => k.KeyType === 'HASH');
-    const pkName = pkAttr?.AttributeName;
+    const pkName = getPkSk(state.tableInfo?.KeySchema).pk;
     if (!pkName) {
         container.innerHTML = '<div class="chart-empty">Partition key not identified.</div>';
         return;
@@ -257,15 +256,15 @@ function renderHeatmap() {
                         : ratio > 0.4 ? `rgba(251,191,36,${0.2 + ratio * 0.5})`
                         :               `rgba(99,102,241,${0.15 + ratio * 0.5})`;
         const textColor = ratio > 0.6 ? '#fff' : 'var(--text-primary)';
-        return `<div class="heatmap-cell" style="background:${bg};color:${textColor}" title="${key}: ${count} items (${pct}%)">
-          <div class="heatmap-key">${truncate(String(key), 18)}</div>
+        return `<div class="heatmap-cell" style="background:${bg};color:${textColor}" title="${escapeHtml(key)}: ${count} items (${pct}%)">
+          <div class="heatmap-key">${escapeHtml(truncate(String(key), 18))}</div>
           <div class="heatmap-count">${count}</div>
           <div class="heatmap-bar" style="width:${intensity}%;background:${ratio > 0.6 ? 'rgba(255,255,255,0.3)' : 'rgba(99,102,241,0.3)'}"></div>
         </div>`;
     }).join('');
 
     container.innerHTML = `
-      <div class="chart-title">Partition Heatmap · <strong>${pkName}</strong> · ${entries.length} unique values · ${totalItems} items loaded</div>
+      <div class="chart-title">Partition Heatmap · <strong>${escapeHtml(pkName)}</strong> · ${entries.length} unique values · ${totalItems} items loaded</div>
       ${hotWarning}
       <div class="heatmap-grid">${cells}</div>
       ${entries.length > 50 ? `<div class="chart-sub">Showing top 50 of ${entries.length} unique values</div>` : ''}
@@ -306,7 +305,7 @@ function barChart(entries, { color = '#6366f1', unit = '', rotateLabels = false,
         return `
           <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${color}" fill-opacity="0.8"/>
           ${val > 0 ? `<text x="${x + barW/2}" y="${y - 4}" text-anchor="middle" font-size="10" fill="${color}">${val}</text>` : ''}
-          <text x="${lx}" y="${svgH - labelH + 12}" text-anchor="${anchor}" font-size="10" fill="var(--text-muted)" ${lrot}>${ltext}</text>
+          <text x="${lx}" y="${svgH - labelH + 12}" text-anchor="${anchor}" font-size="10" fill="var(--text-muted)" ${lrot}>${escapeHtml(ltext)}</text>
         `;
     }).join('');
 

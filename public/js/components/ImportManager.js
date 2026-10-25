@@ -1,8 +1,10 @@
 import { $, $$ } from '../utils/dom.js';
 import { state } from '../state/store.js';
-import { api } from '../api/apiClient.js';
+import { api, tableApi } from '../api/apiClient.js';
 import { showToast } from '../utils/toast.js';
-import { trackWrite } from './CostTracker.js';
+import { trackedWrite } from './CostTracker.js';
+import { escapeHtml } from '../utils/html.js';
+import { fmtNum } from '../utils/format.js';
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 let parsedRows  = [];
@@ -73,9 +75,7 @@ export function initImportManager() {
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('sheet', activeSheet);
-                const resp = await fetch('/api/import/parse-excel', { method: 'POST', body: formData });
-                if (!resp.ok) throw new Error(resp.statusText);
-                const result = await resp.json();
+                const result = await api('POST', '/import/parse-excel', formData);
                 parsedRows  = result.rows;
                 fileColumns = result.columns;
                 workbook    = { ...workbook, ...result };
@@ -126,7 +126,7 @@ function populateTargetTableSelector() {
     const names = tableItems.map(el => el.dataset.table).filter(Boolean);
 
     sel.innerHTML = names.length
-        ? names.map(n => `<option value="${escHtml(n)}"${n === state.currentTable ? ' selected' : ''}>${escHtml(n)}</option>`).join('')
+        ? names.map(n => `<option value="${escapeHtml(n)}"${n === state.currentTable ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')
         : '<option value="">— No tables available —</option>';
 }
 
@@ -153,12 +153,7 @@ async function handleFile(file) {
         } else if (ext === 'xlsx' || ext === 'xls') {
             const formData = new FormData();
             formData.append('file', file);
-            const resp = await fetch('/api/import/parse-excel', { method: 'POST', body: formData });
-            if (!resp.ok) {
-                const err = await resp.json().catch(() => ({ error: resp.statusText }));
-                throw new Error(err.error || 'Excel parse failed');
-            }
-            const result = await resp.json();
+            const result = await api('POST', '/import/parse-excel', formData);
             workbook    = result; // store { sheets, rows, columns } as workbook stand-in
             activeSheet = result.sheets[0];
             parsedRows  = result.rows;
@@ -168,7 +163,7 @@ async function handleFile(file) {
             const sheetSelect = $('#import-sheet-select');
             if (result.sheets.length > 1 && sheetSel && sheetSelect) {
                 sheetSelect.innerHTML = result.sheets
-                    .map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+                    .map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
                 sheetSel.classList.remove('hidden');
             } else {
                 sheetSel?.classList.add('hidden');
@@ -199,7 +194,7 @@ function updateFileMetaLabel() {
     fileColumns = Object.keys(parsedRows[0] || {});
     const meta = $('#import-file-meta');
     if (meta) meta.textContent =
-        `${formatNumber(parsedRows.length)} rows · ${fileColumns.length} columns`;
+        `${fmtNum(parsedRows.length)} rows · ${fileColumns.length} columns`;
 }
 
 // ─── Step navigation ──────────────────────────────────────────────────────────
@@ -242,14 +237,14 @@ function buildMappingUI() {
     const previewTable = $('#import-preview-table');
     if (previewTable) {
         previewTable.innerHTML = `
-            <thead><tr>${fileColumns.map(c => `<th>${escHtml(c)}</th>`).join('')}</tr></thead>
+            <thead><tr>${fileColumns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
             <tbody>${preview5.map(row =>
-                `<tr>${fileColumns.map(c => `<td>${escHtml(String(row[c] ?? ''))}</td>`).join('')}</tr>`
+                `<tr>${fileColumns.map(c => `<td>${escapeHtml(String(row[c] ?? ''))}</td>`).join('')}</tr>`
             ).join('')}</tbody>`;
     }
 
     const badge = $('#import-preview-badge');
-    if (badge) badge.textContent = `first ${Math.min(5, parsedRows.length)} of ${formatNumber(parsedRows.length)}`;
+    if (badge) badge.textContent = `first ${Math.min(5, parsedRows.length)} of ${fmtNum(parsedRows.length)}`;
 
     // Infer types from first 100 rows
     const sample = parsedRows.slice(0, 100);
@@ -260,10 +255,10 @@ function buildMappingUI() {
     container.innerHTML = fileColumns.map(col => {
         const inferred = inferType(sample, col);
         return `
-            <div class="import-mapping-row" data-col="${escHtml(col)}">
-                <span class="import-mapping-col-name" title="${escHtml(col)}">${escHtml(col)}</span>
-                <input type="checkbox" class="map-include" checked data-col="${escHtml(col)}" />
-                <select class="import-mapping-type-select map-type" data-col="${escHtml(col)}">
+            <div class="import-mapping-row" data-col="${escapeHtml(col)}">
+                <span class="import-mapping-col-name" title="${escapeHtml(col)}">${escapeHtml(col)}</span>
+                <input type="checkbox" class="map-include" checked data-col="${escapeHtml(col)}" />
+                <select class="import-mapping-type-select map-type" data-col="${escapeHtml(col)}">
                     <option value="auto"  ${inferred==='auto' ?'selected':''}>Auto</option>
                     <option value="S"     ${inferred==='S'    ?'selected':''}>String</option>
                     <option value="N"     ${inferred==='N'    ?'selected':''}>Number</option>
@@ -272,7 +267,7 @@ function buildMappingUI() {
                     <option value="skip">— Skip —</option>
                 </select>
                 <input type="text" class="import-mapping-rename map-rename"
-                    placeholder="${escHtml(col)}" data-col="${escHtml(col)}" />
+                    placeholder="${escapeHtml(col)}" data-col="${escapeHtml(col)}" />
             </div>`;
     }).join('');
 
@@ -293,7 +288,7 @@ function buildMappingUI() {
 
     const lbl = $('#import-row-count-label');
     const target = $('#import-target-table')?.value || state.currentTable || '?';
-    if (lbl) lbl.textContent = `${formatNumber(parsedRows.length)} rows → "${target}"`;
+    if (lbl) lbl.textContent = `${fmtNum(parsedRows.length)} rows → "${target}"`;
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────
@@ -339,7 +334,7 @@ async function startImport() {
     const progBar    = $('#import-progress-bar');
     const progLabel  = $('#import-progress-label');
 
-    if (statTotal)  statTotal.textContent  = formatNumber(total);
+    if (statTotal)  statTotal.textContent  = fmtNum(total);
     if (statDone)   statDone.textContent   = '0';
     if (statErrors) statErrors.textContent = '0';
     if (progLabel)  progLabel.textContent  = 'Starting…';
@@ -355,9 +350,8 @@ async function startImport() {
 
         const chunk = items.slice(i, i + batchSize);
         try {
-            const _t0 = Date.now();
-            const result = await api('POST', `/tables/${targetTable}/batch-write`, { items: chunk });
-            trackWrite(targetTable, result?.consumedCapacity, 'batchWrite', Date.now() - _t0, chunk.length);
+            const result = await trackedWrite(targetTable, 'batchWrite', chunk.length,
+                () => tableApi('POST', '/batch-write', { items: chunk }, { table: targetTable }));
             done   += result.processedCount       ?? chunk.length;
             errors += result.unprocessedItemsCount ?? 0;
         } catch (err) {
@@ -365,16 +359,16 @@ async function startImport() {
             const msg = `Batch ${Math.floor(i/batchSize)+1}: ${err.message}`;
             if (errList && errors <= 10) {
                 errList.classList.remove('hidden');
-                errList.innerHTML += `<span>${escHtml(msg)}</span>`;
+                errList.innerHTML += `<span>${escapeHtml(msg)}</span>`;
             }
         }
 
         const pct = Math.round((Math.min(done + errors, total) / total) * 100);
         if (progBar)    progBar.style.width    = `${pct}%`;
-        if (statDone)   statDone.textContent   = formatNumber(done);
-        if (statErrors) statErrors.textContent = formatNumber(errors);
+        if (statDone)   statDone.textContent   = fmtNum(done);
+        if (statErrors) statErrors.textContent = fmtNum(errors);
         if (progLabel)  progLabel.textContent  =
-            `Importing… ${formatNumber(Math.min(i + batchSize, total))} / ${formatNumber(total)}`;
+            `Importing… ${fmtNum(Math.min(i + batchSize, total))} / ${fmtNum(total)}`;
 
         await new Promise(r => setTimeout(r, 0)); // yield to browser
     }
@@ -382,15 +376,15 @@ async function startImport() {
     // Final
     if (abortImport) {
         setProgressState('error');
-        if (progLabel) progLabel.textContent = `Aborted. ${formatNumber(done)} imported.`;
+        if (progLabel) progLabel.textContent = `Aborted. ${fmtNum(done)} imported.`;
     } else if (errors === 0) {
         setProgressState('done');
         if (progBar)   progBar.style.width    = '100%';
-        if (progLabel) progLabel.textContent  = `Done! ${formatNumber(done)} items imported.`;
+        if (progLabel) progLabel.textContent  = `Done! ${fmtNum(done)} items imported.`;
     } else {
         setProgressState('error');
         if (progLabel) progLabel.textContent =
-            `Finished with ${formatNumber(errors)} errors. ${formatNumber(done)} imported.`;
+            `Finished with ${fmtNum(errors)} errors. ${fmtNum(done)} imported.`;
     }
 
     $('#import-abort-btn') ?.classList.add('hidden');
@@ -525,12 +519,3 @@ function readAsText(file) {
     });
 }
 
-function escHtml(s) {
-    return String(s)
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function formatNumber(n) {
-    return Number(n).toLocaleString();
-}
