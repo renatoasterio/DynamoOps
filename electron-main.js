@@ -1,37 +1,22 @@
-const { app, BrowserWindow, shell, Menu } = require('electron');
-const path = require('path');
-const fs   = require('fs');
+const { app, BrowserWindow, shell, Menu, session } = require('electron');
+const { DEFAULT_PORT } = require('./src/backend/config/server');
 
 const isMac  = process.platform === 'darwin';
 const isProd = app.isPackaged;   // true when installed/built, false in dev
 
-// ─── Load environment variables from .env / .env.production ─────────
-(function loadEnvFile() {
-    const envFile = isProd ? '.env.production' : '.env';
-    const envPath = path.join(__dirname, envFile);
-    if (!fs.existsSync(envPath)) return;
-    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx === -1) continue;
-        const key = trimmed.slice(0, eqIdx).trim();
-        let val = trimmed.slice(eqIdx + 1).trim();
-        // Strip surrounding quotes
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-            val = val.slice(1, -1);
-        }
-        // Expand \n to actual newlines (for PEM keys)
-        val = val.replace(/\\n/g, '\n');
-        if (!process.env[key]) process.env[key] = val;
-    }
-})();
-
 // ─── Start the Express server in the same process ────────────────────
-const PORT = 3457;
-process.env.PORT = PORT;
+const PORT = DEFAULT_PORT;
+process.env.PORT = String(PORT);
 require('./server');
+
+const APP_ORIGIN = `http://localhost:${PORT}`;
+
+/** Only https links may leave the app (no file:, smb:, custom schemes…). */
+function openExternalSafely(url) {
+    try {
+        if (new URL(url).protocol === 'https:') shell.openExternal(url);
+    } catch { /* malformed URL — ignore */ }
+}
 
 let mainWindow;
 
@@ -46,6 +31,8 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
+            webviewTag: false,
             devTools: !isProd,   // DevTools only available in development
         },
         show: false,
@@ -62,7 +49,7 @@ function createWindow() {
 
     mainWindow = new BrowserWindow(winOptions);
 
-    mainWindow.loadURL(`http://localhost:${PORT}`);
+    mainWindow.loadURL(APP_ORIGIN);
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
@@ -82,10 +69,18 @@ function createWindow() {
         });
     }
 
-    // Open external links in browser
+    // New windows never open inside the app: web links go to the default browser
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
+        openExternalSafely(url);
         return { action: 'deny' };
+    });
+
+    // The window may only ever show the local app
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (new URL(url).origin !== APP_ORIGIN) {
+            event.preventDefault();
+            openExternalSafely(url);
+        }
     });
 }
 
@@ -157,6 +152,9 @@ function createMenu() {
 
 // ─── App lifecycle ───────────────────────────────────────────────────
 app.whenReady().then(() => {
+    // The app needs no camera, mic, geolocation, notifications…
+    session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+
     createMenu();
     createWindow();
 
