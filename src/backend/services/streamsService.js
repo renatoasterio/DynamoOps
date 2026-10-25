@@ -39,7 +39,6 @@ async function getRecentRecords(clients, streamArn) {
     const allShards  = descResult.StreamDescription?.Shards || [];
 
     // Keep only open shards (no EndingSequenceNumber) or most recent closed ones
-    const shardSet = new Set(allShards.map(s => s.ShardId));
     const leafShards = allShards.filter(s =>
         !allShards.some(s2 => s2.ParentShardId === s.ShardId)
     );

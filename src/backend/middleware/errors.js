@@ -43,7 +43,6 @@ function statusFor(err) {
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // Express recognises error handlers by their 4-argument signature
-// eslint-disable-next-line no-unused-vars
 function errorHandler(err, _req, res, _next) {
     const status = statusFor(err);
     if (status >= 500) console.error('[api]', err);
