@@ -38,6 +38,14 @@ let dragSrcIdx = null;
 let colWidths  = {};
 // lastSorted: shallow copy of current sorted items (updated each renderTableView)
 let lastSorted = [];
+// Horizontal padding of a data cell (#data-table td) — text width = column width minus this
+const CELL_PADDING_X = 28;
+
+// Resized columns: cap the cell text at the column width instead of the default 300px
+function cellValueStyle(col) {
+    return colWidths[col] ? ` style="max-width:${colWidths[col] - CELL_PADDING_X}px"` : '';
+}
+
 // Multi-row selection — ids are the JSON of the item's key values
 let selectedKeys   = new Set();
 let selectionTable = null;
@@ -393,6 +401,8 @@ function renderTableView(items = state.items) {
             const startX   = e.clientX;
             const startW   = th.getBoundingClientRect().width;
 
+            const columnCells = dom.dataTbody.querySelectorAll(`.cell-data[data-col="${CSS.escape(col)}"] .cell-value`);
+
             th.classList.add('col-resizing');
             table?.classList.add('is-resizing');
 
@@ -401,6 +411,7 @@ function renderTableView(items = state.items) {
                 th.style.width    = `${newW}px`;
                 th.style.minWidth = `${newW}px`;
                 colWidths[col] = newW;
+                columnCells.forEach(el => { el.style.maxWidth = `${newW - CELL_PADDING_X}px`; });
             };
 
             const onUp = () => {
@@ -432,7 +443,7 @@ function renderTableView(items = state.items) {
             const display = val === undefined ? '' : formatCellValue(val);
             const isKey = keyNames.includes(col);
             const titleVal = escapeHtml(JSON.stringify(val) ?? '');
-            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${col}" title="${titleVal}"><div class="cell-value">${display}</div></td>`;
+            tbody += `<td class="cell-data${isKey ? ' cell-key' : ''}" data-item-idx="${idx}" data-col="${col}" title="${titleVal}"><div class="cell-value"${cellValueStyle(col)}>${display}</div></td>`;
         });
         tbody += '</tr>';
     });
@@ -987,7 +998,7 @@ async function _applyInlineEdit(td, col, itemIdx, origVal, rawStr, origDisplay) 
         if (realIdx !== -1) state.items[realIdx] = updatedItem;
         lastSorted[itemIdx] = updatedItem;
 
-        td.innerHTML = `<div class="cell-value">${newVal === undefined ? '' : formatCellValue(newVal)}</div>`;
+        td.innerHTML = `<div class="cell-value"${cellValueStyle(col)}>${newVal === undefined ? '' : formatCellValue(newVal)}</div>`;
         td.title     = escapeHtml(JSON.stringify(newVal) ?? '');
         showToast(`"${col}" updated`, 'success');
     } catch (err) {
