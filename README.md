@@ -174,6 +174,6 @@ DynamoOps é distribuído sob a **[PolyForm Noncommercial License 1.0.0](LICENSE
 
 - ✅ Você pode usar, copiar, modificar e redistribuir para fins **não comerciais**: uso pessoal, estudo, pesquisa, projetos hobby e organizações sem fins lucrativos (instituições de ensino, ONGs, órgãos públicos).
 - ✅ Ao distribuir cópias ou versões modificadas, mantenha o arquivo `LICENSE` e a linha `Required Notice` com o crédito ao autor.
-- ❌ Uso comercial não é permitido sem autorização do autor — isso inclui vender ou embutir em produto/serviço pago **e** usar a ferramenta no trabalho de uma empresa com fins lucrativos.
+- ❌ Uso comercial não é permitido sem autorização do autor — isso inclui vender ou embutir em produto/serviço pago.
 
 Copyright (c) 2026 Renato Asterio.
