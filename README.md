@@ -1,182 +1,213 @@
 <p align="center">
-  <img src="assets/icons/icon.png" alt="DynamoOps" width="80" />
+  <img src="assets/icons/icon.png" alt="DynamoOps" width="88" />
 </p>
 
 <h1 align="center">DynamoOps</h1>
 
 <p align="center">
-  <strong>Interface desktop gratuita para Amazon DynamoDB.</strong><br/>
-  Consulte, edite e gerencie suas tabelas com a fluidez do MongoDB Compass — no macOS e no Windows.
+  <strong>A free, fast desktop app for Amazon DynamoDB.</strong><br/>
+  Query, edit and manage your tables without fighting the AWS Console. macOS and Windows.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-MIT%20%2B%20Commons%20Clause-blue" />
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" />
-  <img src="https://img.shields.io/badge/node-%3E%3D18-green?logo=node.js&logoColor=white" />
-  <img src="https://img.shields.io/badge/electron-35.x-47848F?logo=electron&logoColor=white" />
+  <a href="https://github.com/renatoasterio/DynamoOps/releases/latest"><img src="https://img.shields.io/github/v/release/renatoasterio/DynamoOps?label=download&color=7c3aed" alt="Latest release" /></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey" alt="macOS and Windows" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT%20%2B%20Commons%20Clause-blue" alt="License" /></a>
+  <a href="https://dynamoops.io/docs"><img src="https://img.shields.io/badge/docs-dynamoops.io-7c3aed" alt="Documentation" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/renatoasterio/DynamoOps/releases/latest"><b>Download</b></a> ·
+  <a href="https://dynamoops.io/docs"><b>Documentation</b></a> ·
+  <a href="#build-from-source"><b>Build from source</b></a> ·
+  <a href="README.pt-BR.md">Leia em português</a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/workspace-overview.jpg" alt="DynamoOps workspace with a table open" width="900" />
 </p>
 
 ---
 
-## Por que o DynamoOps?
+## Why DynamoOps
 
-O AWS Console é lento para o dia a dia e a CLI exige decorar sintaxe. O DynamoOps junta tudo numa interface desktop rápida, com todas as funcionalidades liberadas — sem planos, sem cadastro, sem licença para ativar.
+The AWS Console reloads on every click, and the CLI makes you memorize syntax. DynamoOps puts everything you do with DynamoDB in one fast desktop window.
 
-| Problema | Solução |
+- **Every feature is free.** There are no plans, no trials, no account and no license key.
+- **It runs on your machine.** Credentials and table data never leave it, and there is no telemetry.
+- **It works at work too.** Companies, including for-profit ones, can use it internally.
+
+## Download
+
+Get the latest installers from the **[releases page](https://github.com/renatoasterio/DynamoOps/releases/latest)**.
+
+| System | File |
 |---|---|
-| Console AWS lento e verboso | Interface local instantânea |
-| CLI pouco intuitiva | Scan/Query visual e editor PartiQL com autocomplete |
-| Sem visão rápida dos dados | Tabela, JSON (nativo ou DynamoDB JSON) e gráficos |
-| Gestão de credenciais complexa | Perfis AWS, Assume Role, AWS SSO e LocalStack |
-| Import/Export manual | JSON, CSV e Excel em lote |
-| Trocar de tabela perde contexto | Abas com estado independente |
+| macOS · Apple Silicon (M1 or newer) | `DynamoOps-<version>-arm64.dmg` |
+| macOS · Intel | `DynamoOps-<version>-x64.dmg` |
+| Windows 10/11 · installer | `DynamoOps-Setup-<version>.exe` |
+| Windows 10/11 · portable, no install | `DynamoOps-<version>-portable.exe` |
 
----
+Every release includes `SHA256SUMS.txt` so you can verify the files you downloaded.
 
-## ✨ Funcionalidades
+> [!NOTE]
+> The builds are not signed with Apple or Microsoft certificates yet.
+> - **macOS:** on first launch, macOS says it cannot verify the app. Click **Done**, open **System Settings › Privacy & Security**, click **Open Anyway** next to the DynamoOps message and confirm. You only do this once per version.
+> - **Windows:** if SmartScreen warns you, click **More info** and then **Run anyway**.
 
-### 🔐 Conexão
-- **Perfis AWS** (`~/.aws/credentials`) e **perfis salvos** com conexões recentes.
-- **Assume Role (STS)** com histórico de roles e etiqueta de ambiente (dev, qa, staging, prod, local).
-- **AWS SSO (IAM Identity Center)**: login pelo navegador, escolha de conta e role.
-- **Endpoint customizado**: DynamoDB Local, LocalStack e afins.
+## Features
 
-### 📊 Visualização
-- **Tabela** com colunas ordenáveis, redimensionáveis e reordenáveis, edição inline (duplo clique) e seleção múltipla com exclusão em lote.
-- **JSON** em árvore colapsável, alternando entre JSON nativo e **DynamoDB JSON** (`{"S": …}`, `{"N": …}`).
-- **Gráficos**: timeline, distribuição e heatmap (SVG puro).
-- **Dashboard** da tabela e **Cost Tracker** com o custo estimado de cada operação (RCU/WCU).
+<table>
+<tr>
+<td width="50%">
 
-### 🔍 Consultas
-- **Scan** e **Query** (índice primário e GSIs) com filtros visuais e paginação.
-- **PartiQL** com destaque de sintaxe, templates, formatador, erros inline, confirmação antes de escritas e autocomplete de tabelas, colunas, funções e operadores.
-- **Histórico** de consultas para reaproveitar com um clique.
+**Connect to anything**
+AWS CLI profiles, saved profiles with recent connections, Assume Role with role history, AWS SSO (IAM Identity Center) sign-in in the browser, and custom endpoints for DynamoDB Local and LocalStack. Each connection can carry an environment tag (dev, qa, staging, prod, local).
 
-### ✏️ Itens
-- Inserir, editar, clonar, copiar e excluir itens (editor JSON ou formulário via **templates** por tabela).
-- **Histórico de versões** por item com diff visual e restauração.
-- **Import** JSON/CSV/Excel e **export** JSON/CSV com seleção de campos.
+**Query without the docs open**
+Scan with filter expressions, Query by key on the table or any GSI/LSI, and a PartiQL editor with syntax highlighting, context-aware autocomplete, templates built from your schema, formatting and a confirmation before writes.
 
-### 🗃️ Tabelas e esquema
-- Criar, excluir e truncar tabelas; criar e excluir **GSIs**.
-- **Exportar esquema** para CloudFormation, Terraform e CDK.
-- **Gerador de código** da consulta atual e de SDK completo em várias linguagens.
-- **DynamoDB Streams**: feed ao vivo de INSERT / MODIFY / REMOVE.
+**Edit data in place**
+Double-click a cell to edit it, or open the full JSON editor. Insert, clone and bulk delete items, use per-table insert templates, and restore any previous version from the item history with a field-by-field diff.
 
-### 🎨 Interface
-- Tema escuro e claro, sidebar recolhível, abas e atalhos de teclado.
+</td>
+<td width="50%">
 
-| Atalho | Ação |
+**See what every operation costs**
+The read and write capacity DynamoDB reports for each operation, a running session total per table and a cost alert.
+
+**Watch changes live**
+A real-time DynamoDB Streams feed with INSERT, MODIFY and REMOVE events and attribute-level change summaries.
+
+**Ship infrastructure and code**
+Export a table as CloudFormation, Terraform or Pulumi. Generate a snippet for the current query, or a complete data-access project (entities, repositories, services) in TypeScript, Python, Java, C#, Go, Ruby, PHP or AWS CLI scripts.
+
+**And the rest**
+Multiple tables in tabs, table/JSON/chart views with a partition heatmap, JSON/CSV/Excel import, JSON/CSV export, a table dashboard with CloudWatch metrics, keyboard shortcuts, a collapsible sidebar, and dark and light themes.
+
+</td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/sql-autocomplete.jpg" alt="PartiQL editor with autocomplete" width="440" />
+  <img src="docs/screenshots/streams-panel.jpg" alt="Live DynamoDB Streams feed" width="440" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/cost-panel.jpg" alt="Cost Analytics panel" width="440" />
+  <img src="docs/screenshots/code-generator.jpg" alt="Code generator" width="440" />
+</p>
+
+## Documentation
+
+The full guide, feature by feature with screenshots, lives at **[dynamoops.io/docs](https://dynamoops.io/docs)**. It is also available in [Portuguese](https://dynamoops.io/pt/docs) and [Spanish](https://dynamoops.io/es/docs).
+
+Good places to start:
+
+- [Quick start](https://dynamoops.io/docs/getting-started/quick-start)
+- [Connecting to DynamoDB](https://dynamoops.io/docs/connections/connecting)
+- [Keyboard shortcuts](https://dynamoops.io/docs/workspace/keyboard-shortcuts)
+- [Security and privacy](https://dynamoops.io/docs/reference/security-and-privacy)
+
+## Keyboard shortcuts
+
+`Cmd` on macOS, `Ctrl` on Windows.
+
+| Shortcut | Action |
 |---|---|
-| `Cmd/Ctrl+Enter` | Executar consulta |
-| `Cmd/Ctrl+W` | Fechar aba |
-| `Cmd/Ctrl+R` | Recarregar dados |
-| `Cmd/Ctrl+[` / `]` | Aba anterior / próxima |
-| `Cmd/Ctrl+K` | Buscar tabela na sidebar |
-| `Cmd/Ctrl+B` | Recolher / expandir a sidebar |
-| `Cmd/Ctrl+F` | Filtrar itens carregados |
-| `Esc` | Fechar modal |
+| `Cmd+Enter` | Run the current Scan, Query or SQL |
+| `Cmd+R` | Refresh the current query |
+| `Cmd+W` | Close the active tab |
+| `Cmd+[` / `Cmd+]` | Previous / next tab |
+| `Cmd+K` | Search tables in the sidebar |
+| `Cmd+B` | Collapse or expand the sidebar |
+| `Cmd+F` | Filter the loaded items |
+| `Esc` | Close the open dialog |
 
----
+## Build from source
 
-## 🚀 Começando
-
-### Pré-requisitos
-- **Node.js** 18+ e **npm**
-- Credenciais AWS em `~/.aws/credentials` (ou SSO / LocalStack)
-
-### Instalação
+You need **Node.js 18+**, npm and Git.
 
 ```bash
 git clone https://github.com/renatoasterio/DynamoOps.git
 cd DynamoOps
 npm install
+
+npm run electron   # desktop app
+npm run dev        # browser only, at http://localhost:3457
 ```
 
-### Rodar
+Tests and lint must pass before a pull request is merged:
 
 ```bash
-# Desktop (Electron)
-npm run electron
-
-# Só no navegador → http://localhost:3457
-npm run dev
+npm test
+npm run lint
 ```
 
-### Testes e lint
-
-```bash
-npm test       # Jest (segurança da API, geradores de código, utilitários)
-npm run lint   # ESLint (frontend e backend)
-```
-
-### Gerar instaladores
+Build installers locally (output in `dist/`):
 
 ```bash
 npm run build:prod:mac            # macOS Apple Silicon (.dmg)
 npm run build:prod:mac:universal  # macOS Universal
-npm run build:prod:win            # Windows x64 (instalador NSIS + portable)
+npm run build:prod:win            # Windows x64 (installer + portable)
 ```
 
-Os arquivos ficam em `dist/`. O frontend é empacotado com esbuild numa cópia em staging; os arquivos fonte não são alterados.
+> [!TIP]
+> Building the Windows installer on an Apple Silicon Mac needs Rosetta, because electron-builder's Windows tools are Intel binaries. The release workflow builds both platforms on native GitHub runners, so you rarely need this.
 
-> **Windows**: o SDK lê `%USERPROFILE%\.aws\credentials`. Configure com `aws configure`.
+### Releases
 
----
+Releases are built by [`.github/workflows/release.yml`](.github/workflows/release.yml). Bump the version and push a tag:
 
-## 🏗️ Arquitetura
+```bash
+npm version 3.0.1
+git push --follow-tags
+```
 
-Electron + servidor Express local (porta 3457) + frontend em JavaScript puro (ES modules).
+The workflow runs tests and lint, builds the macOS DMGs and the Windows installer and portable exe, and publishes them with checksums as a GitHub release.
+
+## Architecture
+
+Electron with a local Express server on `127.0.0.1:3457` and a plain JavaScript (ES modules) frontend, with no framework.
 
 ```
-electron-main.js            Processo principal do Electron (sobe o Express, janela em sandbox)
-server.js                   Entry point do Express (modo navegador)
+electron-main.js            Electron main process: starts the server, opens a sandboxed window
+server.js                   Express entry point (browser mode)
 src/backend/
-  config/server.js          Host (127.0.0.1) e porta
-  config/aws.js             Clientes AWS e cache por conexão
-  middleware/security.js    Só aceita o próprio app (Host/Origin) + headers de segurança (CSP…)
-  middleware/errors.js      asyncHandler, erro central, status HTTP a partir dos erros da AWS
-  middleware/validate.js    Validação de nomes de tabela/índice e corpos das requisições
-  middleware/connection.js  Injeta os clientes AWS por requisição
-  controllers/              Handlers finos: connection, table, item, import, sso
-  services/                 dynamoService, stsService, ssoService, streamsService
-  routes/api.js             Rotas /api
+  config/                   Server host/port and AWS clients per connection
+  middleware/               Local-only API (Host/Origin), security headers, errors, validation
+  controllers/, services/   DynamoDB, STS, SSO and Streams
+  routes/api.js             /api routes
 public/
-  index.html, styles.css    SPA e tema (variáveis CSS, escuro/claro)
-  js/state/store.js         Estado global, por aba, e conexão da aba ativa
-  js/api/apiClient.js       api / tableApi / connectedApi (sempre com a conexão da aba)
-  js/utils/                 html (escapeHtml), keySchema, storage, format, dynamoJson, clipboard, download, toast
-  js/codegen/               Geradores de código: um módulo por linguagem em languages/ (query, crud, sdk)
-                            + expressions.js (encoders de literal) e naming.js; index.js é o registry
-  js/components/            DataViewer, QueryPanel, SqlEditor, TabManager, LoginManager, CodeGenerator (UI), …
-  fonts/                    Inter e JetBrains Mono locais (OFL) — nenhuma requisição externa
-scripts/build-prod.js       Build de produção (esbuild + electron-builder)
-tests/                      Testes Jest
+  index.html, styles.css    The single-page app and its themes
+  js/components/            UI components (DataViewer, QueryPanel, SqlEditor, TabManager, …)
+  js/codegen/               Code generators, one module per language
+  js/utils/, js/state/      Helpers and app state
+scripts/build-prod.js       Production build (esbuild + electron-builder)
+tests/                      Jest test suites
 ```
 
-### Segurança
+### Security
 
-- A API local roda com as credenciais AWS do usuário, então só escuta em `127.0.0.1` e recusa requisições com `Host` ou `Origin` de fora do app (protege contra DNS rebinding e contra sites abertos no navegador).
-- Todo dado vindo do DynamoDB é tratado como não confiável: qualquer interpolação em HTML passa por `escapeHtml` (`public/js/utils/html.js`), e a CSP (`script-src 'self'`) bloqueia scripts inline como segunda camada.
-- O Electron roda com `sandbox`, sem Node no renderer, sem navegação para fora do app, e só abre links `https:` no navegador padrão.
+- The local API acts with your AWS credentials, so it listens only on `127.0.0.1` and rejects requests whose `Host` or `Origin` is not the app. This protects against DNS rebinding and against websites in your browser calling it.
+- Data read from DynamoDB is treated as untrusted. Everything rendered as HTML is escaped, and a strict Content Security Policy blocks inline scripts.
+- The Electron window is sandboxed, has no Node.js access, cannot navigate away from the app and only opens `https:` links in your browser.
 
----
+Found a vulnerability? See [SECURITY.md](SECURITY.md).
 
-## 🤝 Contribuindo
+## Contributing
 
-Issues e pull requests são bem-vindos. Antes de abrir um PR, rode `npm test`.
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the code conventions.
 
----
+## License
 
-## 📄 Licença
+DynamoOps is released under the **[MIT License with the Commons Clause](LICENSE)**, plus one extra condition against embedding it in paid products.
 
-DynamoOps é distribuído sob a licença **[MIT + Commons Clause](LICENSE)**, com uma condição adicional contra embutir em produtos pagos.
+- ✅ Anyone, including companies, can use it for free, also at work.
+- ✅ You can copy, modify and redistribute it, keeping the `LICENSE` file and the copyright notice.
+- ❌ You cannot sell DynamoOps or charge for a product or service based on it, including paid hosting, consulting or support.
+- ❌ You cannot embed DynamoOps, in whole or in part, in a paid product or service.
 
-- ✅ Qualquer pessoa ou empresa pode usar gratuitamente — inclusive no trabalho, dentro de empresas com fins lucrativos.
-- ✅ Você pode copiar, modificar e redistribuir, mantendo o arquivo `LICENSE` com o aviso de copyright (o crédito ao autor).
-- ❌ Não é permitido vender o DynamoOps nem cobrar por produto ou serviço baseado nele (inclusive hospedagem, consultoria ou suporte pagos).
-- ❌ Não é permitido embutir o DynamoOps, total ou parcialmente, em produto ou serviço pago.
+Because of these restrictions the license is *source-available* rather than open source as defined by the [OSI](https://opensource.org/osd).
 
-Por causa dessas restrições, a licença é *source-available* (código aberto para uso) e não "open source" no sentido da [OSI](https://opensource.org/osd).
-
-Copyright (c) 2026 Renato Asterio.
+Copyright © 2026 Renato Asterio.

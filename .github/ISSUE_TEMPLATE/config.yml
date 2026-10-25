@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://dynamoops.io/docs
+    about: Guides for every feature, in English, Portuguese and Spanish.
+  - name: Report a security vulnerability
+    url: https://github.com/renatoasterio/DynamoOps/security/advisories/new
+    about: Please report security problems privately, not in a public issue.

@@ -1,0 +1,59 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **do not include AWS credentials or real table data**. Replace them with placeholders.
+        For security problems, use [private vulnerability reporting](https://github.com/renatoasterio/DynamoOps/security/advisories/new) instead.
+  - type: input
+    id: version
+    attributes:
+      label: DynamoOps version
+      placeholder: "3.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows
+        - Other / built from source
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How do you connect?
+      options:
+        - AWS CLI profile (Quick Connect)
+        - Assume Role
+        - AWS SSO (IAM Identity Center)
+        - Custom endpoint (LocalStack / DynamoDB Local)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the table …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+      description: Paste the exact error message if there was one.
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
