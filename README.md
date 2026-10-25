@@ -103,10 +103,11 @@ npm run electron
 npm run dev
 ```
 
-### Testes
+### Testes e lint
 
 ```bash
-npm test
+npm test       # Jest (inclui testes de segurança da API)
+npm run lint   # ESLint (frontend e backend)
 ```
 
 ### Gerar instaladores
@@ -128,22 +129,33 @@ Os arquivos ficam em `dist/`. O frontend é empacotado com esbuild numa cópia e
 Electron + servidor Express local (porta 3457) + frontend em JavaScript puro (ES modules).
 
 ```
-electron-main.js          Processo principal do Electron (sobe o Express)
-server.js                 Entry point do Express (modo navegador)
+electron-main.js            Processo principal do Electron (sobe o Express, janela em sandbox)
+server.js                   Entry point do Express (modo navegador)
 src/backend/
-  config/aws.js           Clientes AWS e cache por conexão
+  config/server.js          Host (127.0.0.1) e porta
+  config/aws.js             Clientes AWS e cache por conexão
+  middleware/security.js    Só aceita o próprio app (Host/Origin) + headers de segurança (CSP…)
+  middleware/errors.js      asyncHandler, erro central, status HTTP a partir dos erros da AWS
+  middleware/validate.js    Validação de nomes de tabela/índice e corpos das requisições
   middleware/connection.js  Injeta os clientes AWS por requisição
-  controllers/            connection, table, item, import, sso
-  services/               dynamoService, stsService, ssoService, streamsService
-  routes/api.js           Rotas /api
+  controllers/              Handlers finos: connection, table, item, import, sso
+  services/                 dynamoService, stsService, ssoService, streamsService
+  routes/api.js             Rotas /api
 public/
-  index.html, styles.css  SPA e tema (variáveis CSS, escuro/claro)
-  js/state/store.js       Estado global e por aba
-  js/api/apiClient.js     Wrapper de fetch com headers de conexão
-  js/components/          DataViewer, QueryPanel, SqlEditor, TabManager, LoginManager, …
-scripts/build-prod.js     Build de produção (esbuild + electron-builder)
-tests/                    Testes Jest
+  index.html, styles.css    SPA e tema (variáveis CSS, escuro/claro)
+  js/state/store.js         Estado global, por aba, e conexão da aba ativa
+  js/api/apiClient.js       api / tableApi / connectedApi (sempre com a conexão da aba)
+  js/utils/                 html (escapeHtml), keySchema, storage, format, clipboard, download, toast
+  js/components/            DataViewer, QueryPanel, SqlEditor, TabManager, LoginManager, …
+scripts/build-prod.js       Build de produção (esbuild + electron-builder)
+tests/                      Testes Jest
 ```
+
+### Segurança
+
+- A API local roda com as credenciais AWS do usuário, então só escuta em `127.0.0.1` e recusa requisições com `Host` ou `Origin` de fora do app (protege contra DNS rebinding e contra sites abertos no navegador).
+- Todo dado vindo do DynamoDB é tratado como não confiável: qualquer interpolação em HTML passa por `escapeHtml` (`public/js/utils/html.js`), e a CSP (`script-src 'self'`) bloqueia scripts inline como segunda camada.
+- O Electron roda com `sandbox`, sem Node no renderer, sem navegação para fora do app, e só abre links `https:` no navegador padrão.
 
 ---
 

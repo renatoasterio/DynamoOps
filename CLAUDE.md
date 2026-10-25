@@ -18,8 +18,12 @@ Código aberto sob **PolyForm Noncommercial 1.0.0** (`LICENSE`): uso, cópia e m
 src/backend/
   config/aws.js          — AWS clients, cache, assumed role state
   controllers/           — connectionController, tableController
+  config/server.js       — HOST 127.0.0.1 + porta (nunca escutar em 0.0.0.0)
   middleware/
     connection.js        — injeta req.clients por request (ou usa assumed role global)
+    security.js          — localOnly (Host/Origin) + headers (CSP…)
+    errors.js            — asyncHandler + errorHandler (erros AWS → status HTTP)
+    validate.js          — router.param de nomes + requireString/Object/Array
   services/
     dynamoService.js     — scan, query, CRUD, truncate, streams
     stsService.js        — AssumeRole STS
@@ -30,8 +34,9 @@ public/
   index.html             — SPA completa
   styles.css             — tema dark, CSS variables
   js/
-    state/store.js       — state global + config de conexão
-    api/apiClient.js     — fetch wrapper com headers de conexão
+    state/store.js       — state global + config de conexão + getActiveTabConnection()
+    api/apiClient.js     — api(), tableApi() e connectedApi(): use tableApi para /tables/<t>/…
+    utils/               — html.js (escapeHtml), keySchema, storage, format, clipboard, download, toast
     components/
       LoginManager.js    — login, assume role, profiles, env picker
       TabManager.js      — multi-tab com state isolado por tab
@@ -48,6 +53,14 @@ public/
 - `state.tabs[]`: cada tab guarda items, queryState, searchTerm, connection
 - `/disconnect` reseta assumedRoleInfo + currentConfig no backend
 - `resetPreviousSession()` (LoginManager): limpa tudo antes de nova conexão
+
+## Convenções
+
+- Controllers não têm try/catch: lançam (`badRequest`, erros da AWS) e o `errorHandler` responde.
+- Toda interpolação de dado em `innerHTML`/atributos passa por `escapeHtml` — dados do DynamoDB não são confiáveis.
+- Chamadas de tabela usam `tableApi(...)` (conexão da aba ativa + nome codificado); escritas medidas com `trackedWrite(...)`.
+- `localStorage` só via `utils/storage.js` (nunca lança).
+- `npm test` e `npm run lint` precisam passar.
 
 ## Build
 
