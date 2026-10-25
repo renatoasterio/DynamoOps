@@ -9,13 +9,37 @@ const dom = {
     tableSearch: $('#table-search'),
     tableList: $('#table-list'),
     refreshBtn: $('#refresh-tables-btn'),
+    sidebar: $('#sidebar'),
+    collapseBtn: $('#sidebar-collapse-btn'),
+    expandBtn: $('#sidebar-expand-btn'),
 };
+
+const COLLAPSED_KEY = 'dynamoops.sidebarCollapsed';
 
 export function initSidebar() {
     dom.tableSearch.addEventListener('input', (e) => renderTableList(e.target.value));
     dom.refreshBtn.addEventListener('click', loadTables);
 
+    // Collapse / expand — the collapsed state is remembered between sessions
+    let collapsed = false;
+    try { collapsed = localStorage.getItem(COLLAPSED_KEY) === '1'; } catch { /* storage unavailable */ }
+    setSidebarCollapsed(collapsed);
+    if (!/Mac/i.test(navigator.platform || '')) {
+        [dom.collapseBtn, dom.expandBtn].forEach(btn => { if (btn) btn.title = btn.title.replace('⌘', 'Ctrl+'); });
+    }
+    dom.collapseBtn?.addEventListener('click', () => setSidebarCollapsed(true));
+    dom.expandBtn?.addEventListener('click', () => setSidebarCollapsed(false));
+
     document.addEventListener('tabChanged', () => renderTableList());
+}
+
+export function setSidebarCollapsed(collapsed) {
+    dom.sidebar.classList.toggle('collapsed', collapsed);
+    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch { /* storage unavailable */ }
+}
+
+export function toggleSidebar() {
+    setSidebarCollapsed(!dom.sidebar.classList.contains('collapsed'));
 }
 
 export async function loadTables() {

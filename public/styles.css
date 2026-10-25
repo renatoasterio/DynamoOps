@@ -512,6 +512,27 @@ textarea::placeholder {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: width var(--transition-fast), min-width var(--transition-fast);
+}
+
+/* Collapsed: a thin rail with only the expand button */
+#sidebar.collapsed {
+    width: 40px;
+    min-width: 40px;
+    align-items: center;
+}
+
+#sidebar.collapsed > :not(.sidebar-expand-btn) {
+    display: none;
+}
+
+.sidebar-expand-btn {
+    display: none;
+    margin-top: 10px;
+}
+
+#sidebar.collapsed .sidebar-expand-btn {
+    display: inline-flex;
 }
 
 .sidebar-header {
@@ -2043,7 +2064,7 @@ header .logo strong {
 
 /* ─── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-    #sidebar {
+    #sidebar:not(.collapsed) {
         width: 200px;
         min-width: 200px;
     }

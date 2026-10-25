@@ -2,6 +2,7 @@ import { state } from '../state/store.js';
 import { closeTab, switchTab } from './TabManager.js';
 import { executeQuery } from './QueryPanel.js';
 import { $ } from '../utils/dom.js';
+import { setSidebarCollapsed, toggleSidebar } from './Sidebar.js';
 
 export function initKeyboardManager() {
     document.addEventListener('keydown', handleKeydown);
@@ -80,8 +81,14 @@ function handleKeydown(e) {
             }
             break;
 
-        case 'k': { // Cmd+K — Focus sidebar table filter
+        case 'b': // Cmd+B — Collapse / expand sidebar
             e.preventDefault();
+            toggleSidebar();
+            break;
+
+        case 'k': { // Cmd+K — Focus sidebar table filter (expands it if collapsed)
+            e.preventDefault();
+            setSidebarCollapsed(false);
             const sidebarSearch = $('#table-search');
             if (sidebarSearch) { sidebarSearch.focus(); sidebarSearch.select(); }
             break;
