@@ -106,7 +106,7 @@ npm run dev
 ### Testes e lint
 
 ```bash
-npm test       # Jest (inclui testes de segurança da API)
+npm test       # Jest (segurança da API, geradores de código, utilitários)
 npm run lint   # ESLint (frontend e backend)
 ```
 
@@ -145,8 +145,11 @@ public/
   index.html, styles.css    SPA e tema (variáveis CSS, escuro/claro)
   js/state/store.js         Estado global, por aba, e conexão da aba ativa
   js/api/apiClient.js       api / tableApi / connectedApi (sempre com a conexão da aba)
-  js/utils/                 html (escapeHtml), keySchema, storage, format, clipboard, download, toast
-  js/components/            DataViewer, QueryPanel, SqlEditor, TabManager, LoginManager, …
+  js/utils/                 html (escapeHtml), keySchema, storage, format, dynamoJson, clipboard, download, toast
+  js/codegen/               Geradores de código: um módulo por linguagem em languages/ (query, crud, sdk)
+                            + expressions.js (encoders de literal) e naming.js; index.js é o registry
+  js/components/            DataViewer, QueryPanel, SqlEditor, TabManager, LoginManager, CodeGenerator (UI), …
+  fonts/                    Inter e JetBrains Mono locais (OFL) — nenhuma requisição externa
 scripts/build-prod.js       Build de produção (esbuild + electron-builder)
 tests/                      Testes Jest
 ```

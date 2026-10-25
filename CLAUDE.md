@@ -36,7 +36,10 @@ public/
   js/
     state/store.js       — state global + config de conexão + getActiveTabConnection()
     api/apiClient.js     — api(), tableApi() e connectedApi(): use tableApi para /tables/<t>/…
-    utils/               — html.js (escapeHtml), keySchema, storage, format, clipboard, download, toast
+    utils/               — html.js (escapeHtml), keySchema, storage, format, dynamoJson, clipboard, download, toast
+    codegen/             — geradores puros (sem DOM): languages/<lang>.js exporta { id, label, query, crud, sdk };
+                           index.js = registry; expressions.js = encoders de literal (dq, sq, shellQuote…)
+  fonts/                 — Inter + JetBrains Mono locais (a CSP não permite origens externas)
     components/
       LoginManager.js    — login, assume role, profiles, env picker
       TabManager.js      — multi-tab com state isolado por tab
@@ -60,7 +63,8 @@ public/
 - Toda interpolação de dado em `innerHTML`/atributos passa por `escapeHtml` — dados do DynamoDB não são confiáveis.
 - Chamadas de tabela usam `tableApi(...)` (conexão da aba ativa + nome codificado); escritas medidas com `trackedWrite(...)`.
 - `localStorage` só via `utils/storage.js` (nunca lança).
-- `npm test` e `npm run lint` precisam passar.
+- Geradores: todo valor vindo do usuário passa por um encoder de `codegen/expressions.js`; nova linguagem = novo módulo em `codegen/languages/` registrado no `index.js`.
+- `npm test` (Jest com ESM: `tests/*.test.mjs` importam `public/js`) e `npm run lint` precisam passar.
 
 ## Build
 

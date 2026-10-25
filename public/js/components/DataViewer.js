@@ -8,6 +8,7 @@ import { getPkSk, getKeyNames, extractKey } from '../utils/keySchema.js';
 import { copyText } from '../utils/clipboard.js';
 import { downloadBlob } from '../utils/download.js';
 import { loadString, saveString } from '../utils/storage.js';
+import { toDynamoJson } from '../utils/dynamoJson.js';
 
 const dom = {
     dataViewer: $('#data-viewer'),
@@ -518,7 +519,7 @@ function renderJsonView(items = state.items) {
     }
 
     // Edit / clone / delete always work on the native item; only display & copy follow the format
-    const displayItems = jsonFormat === 'dynamo' ? items.map(toDynamoJson) : items;
+    const displayItems = jsonFormat === 'dynamo' ? items.map((item) => toDynamoJson(item)) : items;
 
     let html = '';
     displayItems.forEach((item, index) => {
@@ -562,21 +563,6 @@ function renderJsonView(items = state.items) {
             document.dispatchEvent(new CustomEvent('openDeleteModalRequest', { detail: { item: items[idx] } }));
         });
     });
-}
-
-// Native item → DynamoDB JSON (top-level attribute map of typed AttributeValues)
-export function toDynamoJson(item) {
-    return Object.fromEntries(Object.entries(item).map(([k, v]) => [k, toAttributeValue(v)]));
-}
-
-function toAttributeValue(value) {
-    if (value === null || value === undefined) return { NULL: true };
-    if (typeof value === 'string') return { S: value };
-    if (typeof value === 'number') return { N: String(value) };
-    if (typeof value === 'boolean') return { BOOL: value };
-    if (Array.isArray(value)) return { L: value.map(toAttributeValue) };
-    if (typeof value === 'object') return { M: toDynamoJson(value) };
-    return { S: String(value) };
 }
 
 function buildCompassJson(data, isRoot = false, isLast = true, keyName = null) {

@@ -30,4 +30,14 @@ module.exports = [
         },
         rules,
     },
+    {
+        // Tests that import the browser ES modules
+        files: ['tests/**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 2023,
+            sourceType: 'module',
+            globals: { ...globals.node, ...globals.jest },
+        },
+        rules,
+    },
 ];
