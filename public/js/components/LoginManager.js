@@ -338,6 +338,16 @@ function syncArnFromParts() {
     }
 }
 
+// Second line of a recent connection — enough to tell two roles / endpoints apart
+function recentConnectionMeta(r) {
+    if (r.sso) return `${r.sso.accountName || r.sso.accountId} / ${r.sso.roleName}`;
+    if (r.roleArn) {
+        const parsed = parseRoleArn(r.roleArn);
+        return parsed ? `${parsed.accountId} / ${parsed.roleName}` : r.roleArn.split('/').pop();
+    }
+    return r.endpoint ? `${r.awsProfile} · ${r.endpoint.replace(/^https?:\/\//, '')}` : r.awsProfile;
+}
+
 function renderLoginProfiles() {
     if (!dom.profilesList) return;
     const profiles = JSON.parse(localStorage.getItem('dynamo-gui-profiles') || '{}');
@@ -352,7 +362,7 @@ function renderLoginProfiles() {
             <div class="saved-profile-item-login recent" data-id="${r.id}" data-type="recent">
                 <div class="profile-info">
                     <div class="profile-name">${r.sso ? '🌐 AWS SSO' : r.roleArn ? '🛡️ Assume Role' : '⚡ Quick Connect'}</div>
-                    <div class="profile-meta">${r.region} · ${r.sso ? `${r.sso.accountName || r.sso.accountId} / ${r.sso.roleName}` : r.roleArn ? r.roleArn.split('/').pop() : r.awsProfile}</div>
+                    <div class="profile-meta">${r.region} · ${recentConnectionMeta(r)}</div>
                 </div>
                 <div class="profile-action">→</div>
             </div>
