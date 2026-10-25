@@ -59,6 +59,7 @@ public/
 
 ## Convenções
 
+- A `main` é protegida por ruleset: sem push direto nem force push; toda mudança entra por pull request aprovado pelo Renato. Trabalhe numa branch e abra PR. Para release: PR subindo a versão, merge, depois `git tag vX.Y.Z && git push origin vX.Y.Z` (o push de tag não é bloqueado).
 - Controllers não têm try/catch: lançam (`badRequest`, erros da AWS) e o `errorHandler` responde.
 - Toda interpolação de dado em `innerHTML`/atributos passa por `escapeHtml` — dados do DynamoDB não são confiáveis.
 - Chamadas de tabela usam `tableApi(...)` (conexão da aba ativa + nome codificado); escritas medidas com `trackedWrite(...)`.
