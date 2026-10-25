@@ -83,21 +83,21 @@ function createItem(DynamoDbClient $client, Marshaler $m, string $table, array $
         'createdAt' => gmdate('c'),
     ]));
     $client->putItem(['TableName' => $table, 'Item' => $item]);
-    echo "✅ Criado\\n";
+    echo "✅ Created\\n";
 }
 
 // ── READ — fetch by key ───────────────────────────────────────────────────
 function getItem(DynamoDbClient $client, Marshaler $m, string $table, array $key): void {
     $result = $client->getItem(['TableName' => $table, 'Key' => $key]);
     $item   = isset($result['Item']) ? $m->unmarshalItem($result['Item']) : null;
-    echo "🔍 Item encontrado: " . json_encode($item) . "\\n";
+    echo "🔍 Item found: " . json_encode($item) . "\\n";
 }
 
 // ── READ — listar (Scan) ──────────────────────────────────────────────────────
 function listItems(DynamoDbClient $client, Marshaler $m, string $table): void {
     $result = $client->scan(['TableName' => $table, 'Limit' => 50]);
     $items  = array_map(fn($i) => $m->unmarshalItem($i), $result['Items']);
-    echo "📋 Listados " . count($items) . " items\\n";
+    echo "📋 Listed " . count($items) . " items\\n";
 }
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
@@ -110,13 +110,13 @@ function updateItem(DynamoDbClient $client, Marshaler $m, string $table, array $
         'ExpressionAttributeValues' => $m->marshalItem([':name' => 'Updated Name', ':ts' => gmdate('c')]),
         'ReturnValues'              => 'ALL_NEW',
     ]);
-    echo "✏️  Atualizado\\n";
+    echo "✏️  Updated\\n";
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
 function deleteItem(DynamoDbClient $client, string $table, array $key): void {
     $client->deleteItem(['TableName' => $table, 'Key' => $key]);
-    echo "🗑️  Deletado\\n";
+    echo "🗑️  Deleted\\n";
 }
 
 // ── Run ──────────────────────────────────────────────────────────────────

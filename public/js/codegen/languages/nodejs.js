@@ -62,7 +62,7 @@ function crud({ pkName, pkType, skName, skType }, table, region) {
     const skLine = skName ? `, ${jsKey(skName)}: ${_jsVal(skType)}` : '';
     const keyObj = `{ ${jsKey(pkName)}: ${pkVal}${skLine} }`;
     return `// ── Full CRUD: ${table} ──────────────────────────────────────────────────
-// Instale: npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+// Install: npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
@@ -81,7 +81,7 @@ async function createItem() {
     createdAt: new Date().toISOString(),
   };
   await docClient.send(new PutCommand({ TableName: TABLE, Item: item }));
-  console.log("✅ Criado:", item.${pkName});
+  console.log("✅ Created:", item.${pkName});
 }
 
 // ── READ — fetch by key ───────────────────────────────────────────────────
@@ -90,7 +90,7 @@ async function getItem() {
     TableName: TABLE,
     Key: ${keyObj},
   }));
-  console.log("🔍 Item encontrado:", Item);
+  console.log("🔍 Item found:", Item);
   return Item;
 }
 
@@ -100,7 +100,7 @@ async function listItems() {
     TableName: TABLE,
     Limit: 50,
   }));
-  console.log(\`📋 Listados \${Items.length} items\`);
+  console.log(\`📋 Listed \${Items.length} items\`);
   return Items;
 }
 
@@ -114,7 +114,7 @@ async function updateItem() {
     ExpressionAttributeValues: { ":name": "Updated Name", ":ts": new Date().toISOString() },
     ReturnValues: "ALL_NEW",
   }));
-  console.log("✏️  Atualizado:", Attributes);
+  console.log("✏️  Updated:", Attributes);
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ async function deleteItem() {
     TableName: TABLE,
     Key: ${keyObj},
   }));
-  console.log("🗑️  Deletado");
+  console.log("🗑️  Deleted");
 }
 
 // ── Run ──────────────────────────────────────────────────────────────────

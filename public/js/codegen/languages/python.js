@@ -55,7 +55,7 @@ function crud({ pkName, pkType, skName, skType }, table, region) {
     const skLine = skName ? `, '${skName}': ${_pyVal(skType)}` : '';
     const keyExpr = `{'${pkName}': ${pkVal}${skLine}}`;
     return `# ── Full CRUD: ${table} ─────────────────────────────────────────────────
-# Instale: pip install boto3
+# Install: pip install boto3
 import boto3
 from datetime import datetime, timezone
 
@@ -70,20 +70,20 @@ def create_item():
         'createdAt': datetime.now(timezone.utc).isoformat(),
     }
     table.put_item(Item=item)
-    print(f"✅ Criado: {item['${pkName}']}")
+    print(f"✅ Created: {item['${pkName}']}")
 
 # ── READ — fetch by key ───────────────────────────────────────────────────
 def get_item():
     response = table.get_item(Key=${keyExpr})
     item = response.get('Item')
-    print(f"🔍 Item encontrado: {item}")
+    print(f"🔍 Item found: {item}")
     return item
 
 # ── READ — listar (Scan) ──────────────────────────────────────────────────────
 def list_items():
     response = table.scan(Limit=50)
     items = response['Items']
-    print(f"📋 Listados {len(items)} items")
+    print(f"📋 Listed {len(items)} items")
     return items
 
 # ── UPDATE ────────────────────────────────────────────────────────────────────
@@ -98,12 +98,12 @@ def update_item():
         },
         ReturnValues='ALL_NEW',
     )
-    print(f"✏️  Atualizado: {response['Attributes']}")
+    print(f"✏️  Updated: {response['Attributes']}")
 
 # ── DELETE ────────────────────────────────────────────────────────────────────
 def delete_item():
     table.delete_item(Key=${keyExpr})
-    print("🗑️  Deletado")
+    print("🗑️  Deleted")
 
 # ── Run ──────────────────────────────────────────────────────────────────
 if __name__ == '__main__':

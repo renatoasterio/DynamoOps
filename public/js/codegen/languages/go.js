@@ -107,7 +107,7 @@ func createItem() {
         },
     })
     if err != nil { panic(err) }
-    fmt.Println("✅ Criado")
+    fmt.Println("✅ Created")
 }
 
 // ── READ — fetch by key ───────────────────────────────────────────────────
@@ -117,7 +117,7 @@ func getItem() {
         Key:       key(),
     })
     if err != nil { panic(err) }
-    fmt.Printf("🔍 Item encontrado: %v\\n", result.Item)
+    fmt.Printf("🔍 Item found: %v\\n", result.Item)
 }
 
 // ── READ — listar (Scan) ──────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ func listItems() {
         Limit:     aws.Int32(50),
     })
     if err != nil { panic(err) }
-    fmt.Printf("📋 Listados %d items\\n", len(result.Items))
+    fmt.Printf("📋 Listed %d items\\n", len(result.Items))
 }
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ func updateItem() {
         ReturnValues: types.ReturnValueAllNew,
     })
     if err != nil { panic(err) }
-    fmt.Println("✏️  Atualizado")
+    fmt.Println("✏️  Updated")
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ func deleteItem() {
         Key:       key(),
     })
     if err != nil { panic(err) }
-    fmt.Println("🗑️  Deletado")
+    fmt.Println("🗑️  Deleted")
 }
 
 func main() {

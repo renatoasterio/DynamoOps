@@ -87,7 +87,7 @@ public class DynamoCrud {
                 "createdAt",  AttributeValue.fromS(Instant.now().toString())
             ))
             .build());
-        System.out.println("✅ Criado");
+        System.out.println("✅ Created");
     }
 
     // ── READ — fetch by key ───────────────────────────────────────────────
@@ -98,7 +98,7 @@ public class DynamoCrud {
                 "${pkName}", ${pkAttr}${skLine ? `,\n                "${skName}", ${_javaAttrVal(skType, 'sk-value')}` : ''}
             ))
             .build());
-        System.out.println("🔍 Item encontrado: " + response.item());
+        System.out.println("🔍 Item found: " + response.item());
     }
 
     // ── READ — listar (Scan) ──────────────────────────────────────────────────
@@ -107,7 +107,7 @@ public class DynamoCrud {
             .tableName(TABLE)
             .limit(50)
             .build());
-        System.out.println("📋 Listados: " + response.count() + " items");
+        System.out.println("📋 Listed: " + response.count() + " items");
     }
 
     // ── UPDATE ────────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ public class DynamoCrud {
             ))
             .returnValues(ReturnValue.ALL_NEW)
             .build());
-        System.out.println("✏️  Atualizado");
+        System.out.println("✏️  Updated");
     }
 
     // ── DELETE ────────────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ public class DynamoCrud {
                 "${pkName}", ${pkAttr}${skLine ? `,\n                "${skName}", ${_javaAttrVal(skType, 'sk-value')}` : ''}
             ))
             .build());
-        System.out.println("🗑️  Deletado");
+        System.out.println("🗑️  Deleted");
     }
 
     public static void main(String[] args) {

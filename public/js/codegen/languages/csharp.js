@@ -74,7 +74,7 @@ async Task CreateItem() {
             { "createdAt", new AttributeValue { S = DateTime.UtcNow.ToString("o") } },
         },
     });
-    Console.WriteLine("✅ Criado");
+    Console.WriteLine("✅ Created");
 }
 
 // ── READ — fetch by key ───────────────────────────────────────────────────
@@ -83,7 +83,7 @@ async Task GetItem() {
         TableName = TABLE,
         Key = ${keyDict},
     });
-    Console.WriteLine($"🔍 Item encontrado: {response.Item.Count} atributos");
+    Console.WriteLine($"🔍 Item found: {response.Item.Count} attributes");
 }
 
 // ── READ — listar (Scan) ──────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ async Task ListItems() {
         TableName = TABLE,
         Limit     = 50,
     });
-    Console.WriteLine($"📋 Listados: {response.Items.Count} items");
+    Console.WriteLine($"📋 Listed: {response.Items.Count} items");
 }
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ async Task UpdateItem() {
         },
         ReturnValues = ReturnValue.ALL_NEW,
     });
-    Console.WriteLine("✏️  Atualizado");
+    Console.WriteLine("✏️  Updated");
 }
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ async Task DeleteItem() {
         TableName = TABLE,
         Key       = ${keyDict},
     });
-    Console.WriteLine("🗑️  Deletado");
+    Console.WriteLine("🗑️  Deleted");
 }
 
 // ── Run ──────────────────────────────────────────────────────────────────

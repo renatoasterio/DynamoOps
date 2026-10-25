@@ -39,7 +39,7 @@ function query(ctx) {
 function crud({ pkName, pkType, skName, skType }, table, region) {
     const keyJson = `'{"${pkName}":{"${pkType === 'N' ? 'N' : 'S'}":"${pkType === 'N' ? '1' : 'pk-value'}"}${skName ? `,"${skName}":{"${skType === 'N' ? 'N' : 'S'}":"${skType === 'N' ? '1' : 'sk-value'}"}` : ""}}'`;
     return `# ── Full CRUD: ${table} ─────────────────────────────────────────────────
-# Substitua os valores de chave antes de executar
+# Replace the key values before running
 
 # ── CREATE ────────────────────────────────────────────────────────────────────
 aws dynamodb put-item \\

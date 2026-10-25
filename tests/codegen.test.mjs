@@ -106,6 +106,13 @@ describe('expression attribute names are plain strings', () => {
     });
 });
 
+describe('generated code is in English like the UI', () => {
+    test.each(Object.keys(LANGUAGES))('%s CRUD example', (lang) => {
+        const code = generateCrud(lang, KEYS, 'user-orders', 'sa-east-1');
+        expect(code).not.toMatch(/Criado|Atualizado|Deletado|Listados|encontrado|Instale|Substitua/);
+    });
+});
+
 describe('naming helpers', () => {
     test('casing', () => {
         expect(toPascalCase('user-orders')).toBe('UserOrders');

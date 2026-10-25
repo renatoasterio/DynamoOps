@@ -72,20 +72,20 @@ def create_item
       'createdAt' => Time.now.utc.iso8601
     )
   )
-  puts '✅ Criado'
+  puts '✅ Created'
 end
 
 # ── READ — fetch by key ───────────────────────────────────────────────────
 def get_item
   resp = CLIENT.get_item(table_name: TABLE, key: KEY)
-  puts "🔍 Item encontrado: #{resp.item}"
+  puts "🔍 Item found: #{resp.item}"
   resp.item
 end
 
 # ── READ — listar (Scan) ──────────────────────────────────────────────────────
 def list_items
   resp = CLIENT.scan(table_name: TABLE, limit: 50)
-  puts "📋 Listados #{resp.items.count} items"
+  puts "📋 Listed #{resp.items.count} items"
   resp.items
 end
 
@@ -102,13 +102,13 @@ def update_item
     },
     return_values: 'ALL_NEW'
   )
-  puts "✏️  Atualizado: #{resp.attributes}"
+  puts "✏️  Updated: #{resp.attributes}"
 end
 
 # ── DELETE ────────────────────────────────────────────────────────────────────
 def delete_item
   CLIENT.delete_item(table_name: TABLE, key: KEY)
-  puts '🗑️  Deletado'
+  puts '🗑️  Deleted'
 end
 
 # ── Run ──────────────────────────────────────────────────────────────────
