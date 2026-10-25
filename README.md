@@ -88,8 +88,8 @@ O AWS Console é lento para o dia a dia e a CLI exige decorar sintaxe. O DynamoO
 ### Instalação
 
 ```bash
-git clone https://github.com/renatoasterio/dynamo-studio-gui.git
-cd dynamo-studio-gui
+git clone https://github.com/renatoasterio/DynamoOps.git
+cd DynamoOps
 npm install
 ```
 
