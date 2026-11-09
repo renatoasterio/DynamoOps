@@ -82,3 +82,40 @@ describe('error status mapping', () => {
         expect(statusFor(new Error('boom'))).toBe(500);
     });
 });
+
+describe('dynamoService query key types', () => {
+    test('marshals a string partition key and both numeric sort bounds without losing precision', async () => {
+        const { marshall } = require('@aws-sdk/util-dynamodb');
+        const send = jest.fn().mockResolvedValue({});
+        await dynamoService.query({ docClient: { send } }, 't', {
+            keyConditionExpression: '#pk = :pkval AND #sk BETWEEN :skval AND :skval2',
+            expressionAttributeValues: { ':pkval': '001', ':skval': '9007199254740993', ':skval2': '9007199254740995' },
+            expressionAttributeValueTypes: { ':pkval': 'S', ':skval': 'N', ':skval2': 'N' },
+        });
+        expect(marshall(send.mock.calls[0][0].input.ExpressionAttributeValues)).toEqual({
+            ':pkval': { S: '001' },
+            ':skval': { N: '9007199254740993' },
+            ':skval2': { N: '9007199254740995' },
+        });
+    });
+
+    test('decodes binary input and preserves untyped values', async () => {
+        const send = jest.fn().mockResolvedValue({});
+        await dynamoService.query({ docClient: { send } }, 't', {
+            expressionAttributeValues: { ':pkval': 'AAE=', ':filter': 42 },
+            expressionAttributeValueTypes: { ':pkval': 'B' },
+        });
+        expect(send.mock.calls[0][0].input.ExpressionAttributeValues).toEqual({
+            ':pkval': Buffer.from([0, 1]), ':filter': 42,
+        });
+    });
+
+    test.each([['N', 'abc'], ['B', '!bad!']])('rejects invalid %s input before sending', async (type, value) => {
+        const send = jest.fn();
+        await expect(dynamoService.query({ docClient: { send } }, 't', {
+            expressionAttributeValues: { ':pkval': value },
+            expressionAttributeValueTypes: { ':pkval': type },
+        })).rejects.toMatchObject({ status: 400 });
+        expect(send).not.toHaveBeenCalled();
+    });
+});

@@ -722,20 +722,29 @@ export async function executeQuery(append = false, forcedStartKey) {
                 return;
             }
 
-            const pkParsed = isNaN(pkVal) ? pkVal : Number(pkVal);
+            const keyTypes = new Map((state.tableInfo?.AttributeDefinitions || [])
+                .map(({ AttributeName, AttributeType }) => [AttributeName, AttributeType]));
+            const expressionAttributeValueTypes = {};
+            const parseKey = (placeholder, name, value) => {
+                const type = keyTypes.get(name);
+                if (!type) return isNaN(value) ? value : Number(value);
+                expressionAttributeValueTypes[placeholder] = type;
+                return value;
+            };
+            const pkParsed = parseKey(':pkval', pkName, pkVal);
             let keyConditionExpression = `#pk = :pkval`;
             const expressionAttributeNames = { '#pk': pkName };
             const expressionAttributeValues = { ':pkval': pkParsed };
 
             if (skName && skVal) {
-                const skParsed = isNaN(skVal) ? skVal : Number(skVal);
+                const skParsed = parseKey(':skval', skName, skVal);
                 expressionAttributeNames['#sk'] = skName;
 
                 if (skOp === 'begins_with') {
                     keyConditionExpression += ` AND begins_with(#sk, :skval)`;
                     expressionAttributeValues[':skval'] = skParsed;
                 } else if (skOp === 'between') {
-                    const skParsed2 = isNaN(skVal2) ? skVal2 : Number(skVal2);
+                    const skParsed2 = parseKey(':skval2', skName, skVal2);
                     keyConditionExpression += ` AND #sk BETWEEN :skval AND :skval2`;
                     expressionAttributeValues[':skval'] = skParsed;
                     expressionAttributeValues[':skval2'] = skParsed2;
@@ -746,6 +755,9 @@ export async function executeQuery(append = false, forcedStartKey) {
             }
 
             const params = { keyConditionExpression, expressionAttributeNames, expressionAttributeValues, limit };
+            if (Object.keys(expressionAttributeValueTypes).length) {
+                params.expressionAttributeValueTypes = expressionAttributeValueTypes;
+            }
             if (indexName) params.indexName = indexName;
             // Save base params for full-table export (no pagination key)
             state.lastQueryEndpoint = `/tables/${state.currentTable}/query`;
