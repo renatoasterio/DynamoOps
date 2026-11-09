@@ -13,6 +13,7 @@ const {
 const {
     ScanCommand: DocScanCommand,
     QueryCommand: DocQueryCommand,
+    NumberValue,
     PutCommand,
     UpdateCommand,
     DeleteCommand,
@@ -37,6 +38,28 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function sumCapacityUnits(consumedCapacity = []) {
     return consumedCapacity.reduce((sum, c) => sum + (c.CapacityUnits || 0), 0);
+}
+
+function queryValue(value, type, name) {
+    if (type === undefined) return value;
+    if (typeof value !== 'string') throw badRequest(`Expected a string input for ${name}`);
+    if (type === 'S') return value;
+    if (type === 'N') {
+        const decimal = value.trim();
+        if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(decimal)) {
+            throw badRequest(`Expected a DynamoDB number for ${name}`);
+        }
+        return NumberValue.from(decimal);
+    }
+    if (type === 'B') {
+        const bytes = Buffer.from(value.trim(), 'base64');
+        const canonical = bytes.toString('base64');
+        if (!bytes.length || (value.trim() !== canonical && value.trim() !== canonical.replace(/=+$/, ''))) {
+            throw badRequest(`Expected a base64 binary value for ${name}`);
+        }
+        return bytes;
+    }
+    throw badRequest(`Unknown DynamoDB value type for ${name}`);
 }
 
 /** Shapes a Scan/Query response for the UI. */
@@ -275,7 +298,13 @@ class DynamoService {
             Limit: filters.limit || DEFAULT_PAGE_SIZE,
         };
 
-        if (filters.expressionAttributeValues) params.ExpressionAttributeValues = filters.expressionAttributeValues;
+        if (filters.expressionAttributeValues) {
+            const types = filters.expressionAttributeValueTypes;
+            params.ExpressionAttributeValues = types
+                ? Object.fromEntries(Object.entries(filters.expressionAttributeValues)
+                    .map(([name, value]) => [name, queryValue(value, types[name], name)]))
+                : filters.expressionAttributeValues;
+        }
         if (filters.expressionAttributeNames) params.ExpressionAttributeNames = filters.expressionAttributeNames;
         if (filters.filterExpression) params.FilterExpression = filters.filterExpression;
         if (filters.indexName) params.IndexName = filters.indexName;
