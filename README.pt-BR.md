@@ -24,8 +24,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/workspace-overview.jpg" alt="Área de trabalho do DynamoOps com uma tabela aberta" width="900" />
+  <img src="docs/demo.gif" alt="Demonstração do DynamoOps: conectar, abrir uma tabela, editar uma célula, consultar com PartiQL e autocomplete e ver o custo" width="900" />
 </p>
+
+<p align="center"><sub>Conectar · abrir uma tabela · editar uma célula no lugar · PartiQL com autocomplete · ver quanto cada consulta custou</sub></p>
 
 ---
 
@@ -205,7 +207,7 @@ Encontrou uma vulnerabilidade? Veja o [SECURITY.md](SECURITY.md).
 
 ## Contribuindo
 
-Issues e pull requests são bem-vindos. Leia o [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de trabalho e as convenções do código.
+Issues e pull requests são bem-vindos. Primeira vez por aqui? Procure as issues com o rótulo [`good first issue`](https://github.com/renatoasterio/DynamoOps/labels/good%20first%20issue) ou dê um oi nas [Discussions](https://github.com/renatoasterio/DynamoOps/discussions). Leia o [CONTRIBUTING.md](CONTRIBUTING.md) para o fluxo de trabalho e as convenções do código.
 
 ## Licença
 
@@ -219,3 +221,9 @@ O DynamoOps é distribuído sob a **[licença MIT com a Commons Clause](LICENSE)
 Por causa dessas restrições, a licença é *source-available* (código aberto para uso) e não open source no sentido da [OSI](https://opensource.org/osd).
 
 Copyright © 2026 Renato Asterio.
+
+---
+
+<p align="center">
+  Se o DynamoOps economiza seu tempo, <b>deixe uma ⭐ no GitHub</b>. Isso ajuda outros devs de DynamoDB a encontrar o projeto.
+</p>

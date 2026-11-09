@@ -24,8 +24,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/workspace-overview.jpg" alt="DynamoOps workspace with a table open" width="900" />
+  <img src="docs/demo.gif" alt="DynamoOps demo: connect, open a table, edit a cell inline, run a PartiQL query with autocomplete and check the cost" width="900" />
 </p>
+
+<p align="center"><sub>Connect · open a table · edit a cell in place · PartiQL with autocomplete · see what each query cost</sub></p>
 
 ---
 
@@ -205,7 +207,7 @@ Found a vulnerability? See [SECURITY.md](SECURITY.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the code conventions.
+Issues and pull requests are welcome. New here? Look for issues labelled [`good first issue`](https://github.com/renatoasterio/DynamoOps/labels/good%20first%20issue), or say hi in [Discussions](https://github.com/renatoasterio/DynamoOps/discussions). Read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the code conventions.
 
 ## License
 
@@ -219,3 +221,9 @@ DynamoOps is released under the **[MIT License with the Commons Clause](LICENSE)
 Because of these restrictions the license is *source-available* rather than open source as defined by the [OSI](https://opensource.org/osd).
 
 Copyright © 2026 Renato Asterio.
+
+---
+
+<p align="center">
+  If DynamoOps saves you time, <b>give it a ⭐ on GitHub</b> — it helps other DynamoDB developers find it.
+</p>
