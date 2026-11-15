@@ -273,6 +273,9 @@ function renderHeatmap() {
 
 // ─── SVG Bar Chart ────────────────────────────────────────────────────────────
 
+// Minimum horizontal distance (px) between two x-axis labels
+const MIN_LABEL_GAP = 50;
+
 function barChart(entries, { color = '#6366f1', unit = '', rotateLabels = false, containerWidth = 0 } = {}) {
     if (!entries.length) return '';
 
@@ -285,6 +288,10 @@ function barChart(entries, { color = '#6366f1', unit = '', rotateLabels = false,
     const chartH    = 160;
     const labelH    = 48;
     const padLeft   = 48;
+    const slotW     = barW + 4;
+    // Draw only every nth x-axis label so labels stay ≥ MIN_LABEL_GAP apart;
+    // every bar keeps its full label in the tooltip.
+    const labelStep = Math.max(1, Math.ceil(MIN_LABEL_GAP / slotW));
 
     // Y-axis ticks
     const ticks = 4;
@@ -302,10 +309,14 @@ function barChart(entries, { color = '#6366f1', unit = '', rotateLabels = false,
         const lrot = rotateLabels ? `transform="rotate(-40,${lx},${svgH - labelH + 6})"` : '';
         const anchor = rotateLabels ? 'end' : 'middle';
         const ltext  = truncate(label, rotateLabels ? 12 : 10);
+        const showLabel = i % labelStep === 0;
+        const tooltip = `${label}: ${val}${unit ? ` ${unit}` : ''}`;
         return `
+          <g class="chart-bar"><title>${escapeHtml(tooltip)}</title>
           <rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3" fill="${color}" fill-opacity="0.8"/>
           ${val > 0 ? `<text x="${x + barW/2}" y="${y - 4}" text-anchor="middle" font-size="10" fill="${color}">${val}</text>` : ''}
-          <text x="${lx}" y="${svgH - labelH + 12}" text-anchor="${anchor}" font-size="10" fill="var(--text-muted)" ${lrot}>${escapeHtml(ltext)}</text>
+          ${showLabel ? `<text x="${lx}" y="${svgH - labelH + 12}" text-anchor="${anchor}" font-size="10" fill="var(--text-muted)" ${lrot}>${escapeHtml(ltext)}</text>` : ''}
+          </g>
         `;
     }).join('');
 

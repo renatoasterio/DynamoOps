@@ -20,6 +20,7 @@ const {
     BatchWriteCommand
 } = require('@aws-sdk/lib-dynamodb');
 const { unmarshall } = require('@aws-sdk/util-dynamodb');
+const { decodeSets } = require('../utils/dynamoSets');
 const { badRequest } = require('../middleware/errors');
 
 // BatchWriteItem accepts at most 25 requests per call
@@ -27,6 +28,8 @@ const BATCH_WRITE_LIMIT = 25;
 // Retries for items DynamoDB returns as unprocessed (throttling)
 const BATCH_MAX_RETRIES = 3;
 const DEFAULT_PAGE_SIZE = 50;
+// Parallel PutItem calls when an import must not overwrite existing items
+const CONDITIONAL_PUT_CONCURRENCY = 10;
 
 function chunk(list, size) {
     const chunks = [];
@@ -112,6 +115,40 @@ async function writeInBatches(clients, tableName, requests) {
     }
 
     return { processedCount, unprocessed, consumedCapacity: { CapacityUnits: capacityUnits } };
+}
+
+/**
+ * PutItem with `attribute_not_exists(<partition key>)` for every item
+ * (a few in parallel). Existing items are skipped; other failures are
+ * reported as unprocessed.
+ */
+async function putIfAbsent(clients, tableName, items, table) {
+    const pkName = table.KeySchema.find((k) => k.KeyType === 'HASH').AttributeName;
+    let processedCount = 0;
+    let skippedCount = 0;
+    let capacityUnits = 0;
+    const unprocessed = [];
+
+    for (const batch of chunk(items, CONDITIONAL_PUT_CONCURRENCY)) {
+        await Promise.all(batch.map(async (Item) => {
+            try {
+                const result = await clients.docClient.send(new PutCommand({
+                    TableName: tableName,
+                    Item,
+                    ConditionExpression: 'attribute_not_exists(#pk)',
+                    ExpressionAttributeNames: { '#pk': pkName },
+                    ReturnConsumedCapacity: 'TOTAL',
+                }));
+                capacityUnits += result.ConsumedCapacity?.CapacityUnits ?? 0;
+                processedCount++;
+            } catch (err) {
+                if (err.name === 'ConditionalCheckFailedException') skippedCount++;
+                else unprocessed.push(Item);
+            }
+        }));
+    }
+
+    return { processedCount, skippedCount, unprocessed, consumedCapacity: { CapacityUnits: capacityUnits } };
 }
 
 class DynamoService {
@@ -343,7 +380,7 @@ class DynamoService {
         } else {
             params.UpdateExpression = 'SET #attr = :val';
             params.ExpressionAttributeNames = { '#attr': attributeName };
-            params.ExpressionAttributeValues = { ':val': newValue };
+            params.ExpressionAttributeValues = { ':val': decodeSets(newValue) };
         }
 
         const result = await clients.docClient.send(new UpdateCommand(params));
@@ -352,7 +389,7 @@ class DynamoService {
 
     async putItem(clients, tableName, item) {
         const result = await clients.docClient.send(new PutCommand({
-            TableName: tableName, Item: item, ReturnConsumedCapacity: 'TOTAL'
+            TableName: tableName, Item: decodeSets(item), ReturnConsumedCapacity: 'TOTAL'
         }));
         return { consumedCapacity: result.ConsumedCapacity || null };
     }
@@ -364,9 +401,18 @@ class DynamoService {
         return { consumedCapacity: result.ConsumedCapacity || null };
     }
 
-    async batchWrite(clients, tableName, items) {
-        const result = await writeInBatches(clients, tableName, items.map((Item) => ({ PutRequest: { Item } })));
-        return { ...result, unprocessed: result.unprocessed.map((r) => r.PutRequest.Item) };
+    /**
+     * Writes `items`. With `overwrite: false`, items whose key already exists
+     * are left untouched and counted in `skippedCount` — BatchWriteItem has no
+     * conditions, so each item is then sent as a conditional PutItem.
+     */
+    async batchWrite(clients, tableName, items, { overwrite = true } = {}) {
+        const decoded = items.map(decodeSets);
+        if (overwrite) {
+            const result = await writeInBatches(clients, tableName, decoded.map((Item) => ({ PutRequest: { Item } })));
+            return { ...result, skippedCount: 0, unprocessed: result.unprocessed.map((r) => r.PutRequest.Item) };
+        }
+        return putIfAbsent(clients, tableName, decoded, await this.describeTable(clients, tableName));
     }
 
     async batchDelete(clients, tableName, keys) {

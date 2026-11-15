@@ -304,6 +304,7 @@ async function startImport() {
     showStep(3);
 
     const skipEmpty = $('#import-opt-skip-empty')?.checked ?? true;
+    const overwrite = $('#import-opt-overwrite')?.checked ?? true;
     const batchSize = Math.max(25, Math.min(5000, parseInt($('#import-opt-batch')?.value) || 500));
 
     // Build mapping
@@ -331,18 +332,22 @@ async function startImport() {
     const statDone   = $('#import-stat-done');
     const statTotal  = $('#import-stat-total');
     const statErrors = $('#import-stat-errors');
+    const statSkipped = $('#import-stat-skipped');
+    $('#import-stat-skipped-box')?.classList.toggle('hidden', overwrite);
     const progBar    = $('#import-progress-bar');
     const progLabel  = $('#import-progress-label');
 
     if (statTotal)  statTotal.textContent  = fmtNum(total);
     if (statDone)   statDone.textContent   = '0';
     if (statErrors) statErrors.textContent = '0';
+    if (statSkipped) statSkipped.textContent = '0';
     if (progLabel)  progLabel.textContent  = 'Starting…';
     if (progBar)    progBar.style.width    = '0%';
     setProgressState('running');
 
     let done   = 0;
     let errors = 0;
+    let skipped = 0;
     const errList = $('#import-error-list');
 
     for (let i = 0; i < items.length; i += batchSize) {
@@ -351,8 +356,9 @@ async function startImport() {
         const chunk = items.slice(i, i + batchSize);
         try {
             const result = await trackedWrite(targetTable, 'batchWrite', chunk.length,
-                () => tableApi('POST', '/batch-write', { items: chunk }, { table: targetTable }));
-            done   += result.processedCount       ?? chunk.length;
+                () => tableApi('POST', '/batch-write', { items: chunk, overwrite }, { table: targetTable }));
+            done    += result.processedCount       ?? chunk.length;
+            skipped += result.skippedCount         ?? 0;
             errors += result.unprocessedItemsCount ?? 0;
         } catch (err) {
             errors += chunk.length;
@@ -363,10 +369,11 @@ async function startImport() {
             }
         }
 
-        const pct = Math.round((Math.min(done + errors, total) / total) * 100);
+        const pct = Math.round((Math.min(done + errors + skipped, total) / total) * 100);
         if (progBar)    progBar.style.width    = `${pct}%`;
         if (statDone)   statDone.textContent   = fmtNum(done);
         if (statErrors) statErrors.textContent = fmtNum(errors);
+        if (statSkipped) statSkipped.textContent = fmtNum(skipped);
         if (progLabel)  progLabel.textContent  =
             `Importing… ${fmtNum(Math.min(i + batchSize, total))} / ${fmtNum(total)}`;
 
@@ -380,7 +387,8 @@ async function startImport() {
     } else if (errors === 0) {
         setProgressState('done');
         if (progBar)   progBar.style.width    = '100%';
-        if (progLabel) progLabel.textContent  = `Done! ${fmtNum(done)} items imported.`;
+        if (progLabel) progLabel.textContent  = `Done! ${fmtNum(done)} items imported.`
+            + (skipped ? ` ${fmtNum(skipped)} skipped (already existed).` : '');
     } else {
         setProgressState('error');
         if (progLabel) progLabel.textContent =

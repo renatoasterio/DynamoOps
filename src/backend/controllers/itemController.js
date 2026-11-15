@@ -27,10 +27,12 @@ module.exports = {
 
     async batchWrite(req, res) {
         const items = requireArray(req.body?.items, 'items', { of: requireObject });
-        const result = await dynamoService.batchWrite(req.clients, req.params.name, items);
+        const overwrite = req.body?.overwrite !== false;
+        const result = await dynamoService.batchWrite(req.clients, req.params.name, items, { overwrite });
         res.json({
             success: true,
             processedCount: result.processedCount,
+            skippedCount: result.skippedCount,
             unprocessedItemsCount: result.unprocessed.length,
             unprocessedItems: result.unprocessed.slice(0, UNPROCESSED_SAMPLE),
             consumedCapacity: result.consumedCapacity,
