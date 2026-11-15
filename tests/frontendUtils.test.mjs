@@ -54,3 +54,21 @@ describe('format', () => {
         expect(fmtBytes(5 * 1024 ** 3)).toBe('5.0 GB');
     });
 });
+
+describe('toDynamoJson with sets (#10)', () => {
+    test('tagged sets become SS / NS / BS', () => {
+        expect(toDynamoJson({
+            owners: { $SS: ['payments', 'web'] },
+            weights: { $NS: [1, 2] },
+            blobs: { $BS: ['AQID'] },
+        })).toEqual({
+            owners: { SS: ['payments', 'web'] },
+            weights: { NS: ['1', '2'] },
+            blobs: { BS: ['AQID'] },
+        });
+    });
+
+    test('a map with other keys stays a map', () => {
+        expect(toDynamoJson({ m: { $SS: ['a'], x: 1 } }).m.M).toBeDefined();
+    });
+});

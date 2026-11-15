@@ -4,12 +4,23 @@ const { DEFAULT_PORT } = require('./src/backend/config/server');
 const isMac  = process.platform === 'darwin';
 const isProd = app.isPackaged;   // true when installed/built, false in dev
 
-// ─── Start the Express server in the same process ────────────────────
-const PORT = DEFAULT_PORT;
-process.env.PORT = String(PORT);
-require('./server');
+const { start: startServer } = require('./server');
 
-const APP_ORIGIN = `http://localhost:${PORT}`;
+// ─── Single instance ─────────────────────────────────────────────────
+// Launching the app again focuses the existing window instead of opening a
+// second copy.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) app.quit();
+
+app.on('second-instance', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+});
+
+// Set once the Express server (same process) is listening. The preferred port
+// is kept when free so the UI origin — and its localStorage — stays stable.
+let APP_ORIGIN = null;
 const ALLOWED_PERMISSIONS = new Set(['clipboard-sanitized-write']);
 
 /** Only https links may leave the app (no file:, smb:, custom schemes…). */
@@ -152,7 +163,18 @@ function createMenu() {
 }
 
 // ─── App lifecycle ───────────────────────────────────────────────────
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    if (!gotSingleInstanceLock) return;
+    try {
+        const port = await startServer(DEFAULT_PORT, { fallback: true });
+        process.env.PORT = String(port);
+        APP_ORIGIN = `http://localhost:${port}`;
+    } catch (err) {
+        console.error('Could not start the local server:', err);
+        app.quit();
+        return;
+    }
+
     // Only clipboard writes (the "Copy" buttons) are needed — deny everything
     // else: camera, mic, geolocation, notifications…
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {

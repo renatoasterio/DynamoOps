@@ -4,12 +4,15 @@ const apiRoutes = require('./routes/api');
 const connectionMiddleware = require('./middleware/connection');
 const { localOnly, securityHeaders } = require('./middleware/security');
 const { HttpError, errorHandler } = require('./middleware/errors');
+const { setReplacer } = require('./utils/dynamoSets');
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
 
 const app = express();
 
 app.disable('x-powered-by');
+// DynamoDB sets come back from the DocumentClient as JS Sets (→ `{}` in JSON)
+app.set('json replacer', setReplacer);
 app.use(securityHeaders);
 app.use(localOnly);
 app.use(express.json({ limit: '50mb' }));

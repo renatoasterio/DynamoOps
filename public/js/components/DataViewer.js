@@ -8,7 +8,7 @@ import { getPkSk, getKeyNames, extractKey } from '../utils/keySchema.js';
 import { copyText } from '../utils/clipboard.js';
 import { downloadBlob } from '../utils/download.js';
 import { loadString, saveString } from '../utils/storage.js';
-import { toDynamoJson } from '../utils/dynamoJson.js';
+import { toDynamoJson, setTypeOf } from '../utils/dynamoJson.js';
 
 const dom = {
     dataViewer: $('#data-viewer'),
@@ -811,6 +811,10 @@ function doExportCsv(fields, items) {
 
 function formatCellValue(val) {
     if (val === null) return '<span style="color:var(--text-muted);font-style:italic">null</span>';
+    const setType = setTypeOf(val);
+    if (setType) {
+        return `<span style="color:var(--text-muted)">${setType}</span> ${escapeHtml(JSON.stringify(val[`$${setType}`]))}`;
+    }
     if (typeof val === 'object') return escapeHtml(JSON.stringify(val));
     if (typeof val === 'boolean') return `<span style="color:var(--info)">${val}</span>`;
     if (typeof val === 'number') return `<span style="color:var(--warning)">${val}</span>`;
